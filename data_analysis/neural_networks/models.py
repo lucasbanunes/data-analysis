@@ -157,9 +157,13 @@ class SequentialModel():
                  max_queue_size=10, 
                  workers=1, 
                  use_multiprocessing=False):
-        raise NotImplementedError
+        """Alias of keras Sequential.evaluate method"""
+        return self.model.evaluate(
+                x=None, y=None, batch_size=None, verbose=1, sample_weight=None, steps=None,
+                callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False)
 
     def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
+        """Alias of keras Sequential.predict method"""
         return self.model.predict(x, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing)
 
     def train_on_batch(self, x, y, sample_weight=None, class_weight=None, reset_metrics=True):
@@ -246,9 +250,6 @@ class SequentialModel():
             
         return best_log, best_init   
 
-    def evaluate_generator(self, generator, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False, verbose=0):
-        raise NotImplementedError
-
     def get_layer(self, name=None, index=None):
         """Returns a layer based on the parameters.
         If none were passed, returns a list qith all layers
@@ -278,10 +279,11 @@ class SequentialModel():
             raise ValueError('The index parameter must be a python int and the name parameter a python string')
     
     def add(self, layer):
+        """Alias of keras Sequential.add method"""
         self.layers_config[class_name(layer)] = layer.get_config()
 
     def save(self,  filepath, overwrite=True, save_format='tf', signatures=None, options=None):
-        """Same functionality of keras Sequential.save method"""
+        """Alias of keras Sequential.save method"""
 
         self.model.save(filepath, overwrite=overwrite, include_optimizer=True, save_format=save_format, signatures=None, options=None)
 
