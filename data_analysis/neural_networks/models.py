@@ -90,7 +90,7 @@ class SequentialModel():
         n_inits: int
             Number of initializations of the model
         
-        init_metric: string
+        init_metric: str
             Name of the metric mesured during the fitting of the model that will be used to select
             the best method
 
@@ -160,7 +160,7 @@ class SequentialModel():
         raise NotImplementedError
 
     def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
-        raise NotImplementedError
+        return self.model.predict(x, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing)
 
     def train_on_batch(self, x, y, sample_weight=None, class_weight=None, reset_metrics=True):
         raise NotImplementedError
@@ -193,7 +193,7 @@ class SequentialModel():
         n_inits: int
             Number of initializations of the model
         
-        init_metric: string
+        init_metric: str
             Name of the metric mesured during the fitting of the model that will be used to select
             the best method
 
@@ -249,23 +249,57 @@ class SequentialModel():
     def evaluate_generator(self, generator, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False, verbose=0):
         raise NotImplementedError
 
-    def predict_generator(self, generator, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False, verbose=0):
-        raise NotImplementedError
-
     def get_layer(self, name=None, index=None):
-        raise NotImplementedError
+        """Returns a layer based on the parameters.
+        If none were passed, returns a list qith all layers
+        If both are passed index takes precedence
+
+        Parameters:
+
+        name: str
+            Name of the desired layer
+        
+        index: int
+            Index of the desired layer where -1 is the output layer of the model and 0 the input layer
+        """
+
+        if (type(index) == type(None)) and (type(name) == type(None)):
+            return self.model.layers
+        elif type(index) == int:
+            return self.model.layers[index]
+        elif type(name) == str:
+            for layer in self.model.layers:
+                try:
+                    layer.get_config[name]
+                    return layer
+                except:
+                    pass
+        else:
+            raise ValueError('The index parameter must be a python int and the name parameter a python string')
     
     def add(self, layer):
         self.layers_config[class_name(layer)] = layer.get_config()
 
-    def get_layers(self):
-        return self.model.layers
-
     def save(self,  filepath, overwrite=True, save_format='tf', signatures=None, options=None):
+        """Same functionality of keras Sequential.save method"""
+
         self.model.save(filepath, overwrite=overwrite, include_optimizer=True, save_format=save_format, signatures=None, options=None)
 
     @classmethod
     def load(cls, filepath):
+
+        """Loads the model from filepath
+
+        Parameters
+
+        filepath: str
+            Location of the model to be loaded
+        
+        Return
+
+        sequential_model: SequentialModel
+            An instance of Sequential Model loaded from the file
+        """
 
         model = load_model(filepath)
         layers_config = OrderedDict()
