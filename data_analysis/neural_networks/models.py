@@ -1,3 +1,4 @@
+import gc
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -10,18 +11,21 @@ from data_analysis.functions.utils import class_name
 
 
 class SequentialModel():
+    """ Implements the Keras package Sequential Model with fitting with mutiple inits to avoid bad starting"""
+
     def __init__(self, **layers):
 
         #Attributes
         self.model = Sequential()
         self.layers_config = OrderedDict()
-        self.compile_config = None
 
         if layers:
             self.model = Sequential()
             for layer_name, layer_parameters in layers.items():
                 layer = getattr(keras.layers, layer_name)(**layer_parameters)
                 self.layers_config[layer_name] = layer.get_config()
+            
+        gc.collect()    #Collecting the layers instances
     
     def compile(self, optimizer, 
                 loss=None, 
@@ -29,9 +33,9 @@ class SequentialModel():
                 loss_weights=None, 
                 sample_weight_mode=None, 
                 weighted_metrics=None, 
-                target_tensors=None):#Keras Sequential method
+                target_tensors=None):
 
-        self.compile_config = dict(optimizer=optimizer, 
+        self.compile_params = dict(optimizer=optimizer, 
                                    loss=loss, 
                                    metrics=metrics, 
                                    loss_weights=loss_weights, 
@@ -58,7 +62,28 @@ class SequentialModel():
             validation_freq=1, 
             max_queue_size=10, 
             workers=1, 
-            use_multiprocessing=False):#Keras Sequential method
+            use_multiprocessing=False):
+        """Alias for the fit method from keras.models.Sequential with multiple initializations.
+        All parameters except the ones below function exactly like the ones from the cited method
+        and are applied to every initialization.
+           
+        Parameters:
+        
+        n_inits: int
+            Number of initializations of the model
+        
+        init_metric: string
+            Name of the metric mesured during the fitting of the model that will be used to select
+            the best method
+
+        Returns:
+        
+        best_log: keras.callbacks.callbacks.History
+            History callback from the best model
+        
+        best_init: int
+            Number of the best initialization statring from zero
+        """
 
         if verbose:
             print('Starting the multiple initializations')
@@ -86,9 +111,6 @@ class SequentialModel():
                                             max_queue_size=max_queue_size, 
                                             workers=workers, 
                                             use_multiprocessing=use_multiprocessing)
-
-            if verbose:
-                print('---------------------------------------------------------------------------------------------------')
             
             if init == 0:
                 best_model = current_model
@@ -99,11 +121,12 @@ class SequentialModel():
                     best_model = current_model
                     best_log = current_log
                     best_init = init
+            
+            gc.collect()    #Collecting the discarded model instance
 
-            self.model = best_model
-            self.training_log = best_log
+        self.model = best_model
 
-        return best_model, best_log, best_init   
+        return best_log, best_init   
         
     def evaluate(self, x=None, 
                  y=None, 
@@ -114,13 +137,13 @@ class SequentialModel():
                  callbacks=None, 
                  max_queue_size=10, 
                  workers=1, 
-                 use_multiprocessing=False):#Keras Sequential method
+                 use_multiprocessing=False):
         raise NotImplementedError
 
-    def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):#Keras Sequential method
+    def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
         raise NotImplementedError
 
-    def train_on_batch(self, x, y, sample_weight=None, class_weight=None, reset_metrics=True):#Keras Sequential method
+    def train_on_batch(self, x, y, sample_weight=None, class_weight=None, reset_metrics=True):
         raise NotImplementedError
 
     def predict_on_batch(self, x):
@@ -141,7 +164,28 @@ class SequentialModel():
                       workers=1, 
                       use_multiprocessing=False, 
                       shuffle=True, 
-                      initial_epoch=0):#Keras Sequential method
+                      initial_epoch=0):
+        """Alias for the fit_generator method from keras.models.Sequential with multiple initializations.
+        All parameters except the ones below function exactly like the ones from the cited method
+        and are applied to every initialization.
+           
+        Parameters:
+        
+        n_inits: int
+            Number of initializations of the model
+        
+        init_metric: string
+            Name of the metric mesured during the fitting of the model that will be used to select
+            the best method
+
+        Returns:
+        
+        best_log: keras.callbacks.callbacks.History
+            History callback from the best model
+        
+        best_init: int
+            Number of the best initialization statring from zero
+        """
 
         if verbose:
             print('Starting the multiple initializations')
@@ -168,9 +212,6 @@ class SequentialModel():
                                               shuffle=shuffle, 
                                               initial_epoch=initial_epoch)
             
-            if verbose:
-                print('---------------------------------------------------------------------------------------------------')
-            
             if init == 0:
                 best_model = current_model
                 best_log = current_log
@@ -182,24 +223,29 @@ class SequentialModel():
                     best_init = init
             
             self.model = best_model
-            self.training_log = best_log
             
-        return best_model, best_log, best_init   
+        return best_log, best_init   
 
-    def evaluate_generator(self, generator, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False, verbose=0):#Keras Sequential method
+    def evaluate_generator(self, generator, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False, verbose=0):
         raise NotImplementedError
 
-    def predict_generator(self, generator, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False, verbose=0):#Keras Sequential method
+    def predict_generator(self, generator, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False, verbose=0):
         raise NotImplementedError
 
-    def get_layer(self, name=None, index=None):#Keras Sequential method
+    def get_layer(self, name=None, index=None):
         raise NotImplementedError
     
-    def add(self, layer):#Keras Sequential method
+    def add(self, layer):
         self.layers_config[class_name(layer)] = layer.get_config()
 
     def get_layers(self):
         return self.model.layers
+
+    def save(self, path):
+        raise NotImplementedError
+
+    def load(self, path):
+        raise NotImplementedError
 
     def _build_model(self):
         model = Sequential()
@@ -208,6 +254,6 @@ class SequentialModel():
             layer_parameters.pop('name')
             layer = getattr(keras.layers, layer_name)(**layer_parameters)
             model.add(layer)
-        model.compile(**self.compile_config)
+        model.compile(**self.compile_params)
         return model
 
