@@ -6,7 +6,7 @@ import tensorflow as tf
 from copy import deepcopy
 from collections import OrderedDict
 from tensorflow import keras
-from tensorflow.keras.models import Sequential, save_model, load_model
+from tensorflow.keras.models import Sequential, load_model
 from data_analysis.functions.utils import class_name
 
 
@@ -261,11 +261,31 @@ class SequentialModel():
     def get_layers(self):
         return self.model.layers
 
-    def save(self, path):
-        raise NotImplementedError
+    def save(self,  filepath, overwrite=True, save_format='tf', signatures=None, options=None):
+        self.model.save(filepath, overwrite=overwrite, include_optimizer=True, save_format=save_format, signatures=None, options=None)
 
-    def load(self, path):
-        raise NotImplementedError
+    @classmethod
+    def load(cls, filepath):
+
+        model = load_model(filepath)
+        layers_config = OrderedDict()
+        optimizer_config = OrderedDict()
+        loss_config = OrderedDict()
+
+        for layer in model.layers:
+            layers_config[class_name(layer)] = layer.get_config()
+        
+        optimizer_config[class_name(model.optimizer)] = model.optimizer.get_config()
+
+        loss = getattr(keras.losses, model.loss)()
+        loss_config[class_name(loss)] = loss.get_config()
+
+        sequential_model = cls(**layers_config)
+        sequential_model.optimizer_config = optimizer_config
+        sequential_model.loss_config = loss_config
+        sequential_model.trained = True
+
+        return sequential_model
 
     def _build_model(self):
         model = Sequential()
