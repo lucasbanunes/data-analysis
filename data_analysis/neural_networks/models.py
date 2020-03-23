@@ -6,7 +6,7 @@ import tensorflow as tf
 from copy import deepcopy
 from collections import OrderedDict
 from tensorflow import keras
-from tensorflow.keras.models import Sequential, clone_model
+from tensorflow.keras.models import Sequential, save_model, load_model
 from data_analysis.functions.utils import class_name
 
 
@@ -18,6 +18,9 @@ class SequentialModel():
         #Attributes
         self.model = Sequential()
         self.layers_config = OrderedDict()
+        self.optimizer_config = OrderedDict()
+        self.loss_config = OrderedDict()
+        self.trained = False
 
         if layers:
             self.model = Sequential()
@@ -42,6 +45,21 @@ class SequentialModel():
                                    sample_weight_mode=sample_weight_mode, 
                                    weighted_metrics=weighted_metrics, 
                                    target_tensors=target_tensors)
+
+        if type(optimizer) == str:
+            self.optimizer_config[optimizer] = getattr(keras.optimizers, optimizer).get_config()
+        elif issubclass(type(optimizer), keras.optimizers.Optimizer):
+            self.optimizer_config[class_name(optimizer)] = optimizer.get_config()
+        else:
+            raise ValueError('The optimizer must be an instance of a class in keras.optimizers or a string with its name')
+
+        if type(loss) == str:
+            self.loss_config[loss] = getattr(keras.optimizers, loss).get_config()
+        elif issubclass(type(loss), keras.losses.Loss):
+            self.optimizer_config[class_name(loss)] = loss.get_config()
+        else:
+            raise ValueError('The los must be an instance of a class in keras.losses or a string with its name')
+        
 
     def fit(self, x=None, 
             y=None, 
@@ -125,6 +143,7 @@ class SequentialModel():
             gc.collect()    #Collecting the discarded model instance
 
         self.model = best_model
+        self.trained = True
 
         return best_log, best_init   
         
@@ -223,6 +242,7 @@ class SequentialModel():
                     best_init = init
             
             self.model = best_model
+            self.trained = True
             
         return best_log, best_init   
 
@@ -252,8 +272,9 @@ class SequentialModel():
         for layer_name, layer_parameters in self.layers_config.items():
             layer_parameters = deepcopy(layer_parameters)
             layer_parameters.pop('name')
-            layer = getattr(keras.layers, layer_name)(**layer_parameters)
+            layer = getattr(keras.layers, layer_name).from_config(layer_parameters)
             model.add(layer)
         model.compile(**self.compile_params)
+        gc.collect()    #Collecting lost layers generated
         return model
 
