@@ -1,4 +1,2 @@
 .vscode/
-data_analysis/neural_networks/__pycache__/
-data_analysis/functions/__pycache__/
-data_analysis/metrics/__pycache__/
+**/__pycache__
