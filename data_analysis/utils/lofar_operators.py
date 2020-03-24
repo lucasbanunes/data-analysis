@@ -10,7 +10,7 @@ def lofar2img(lofar_data, windows):
 
     Parameters:
 
-    lofar_data: numpy.array
+    lofar_data: numpy.ndarray
         Full lofar spectrogram where x is frequency and y is time
 
     self.windows: array like
@@ -18,7 +18,7 @@ def lofar2img(lofar_data, windows):
 
     Returns:
 
-    images: numpy.array
+    images: numpy.ndarray
         Array with the images mountes from the windows
     """
 
@@ -54,10 +54,10 @@ def window_runs(classes_runs, window_size, stride):
 
     Returns:
 
-    windows: numpy.array
+    windows: numpy.ndarray
         Array with the windows ranges
     
-    win_labels: numpy.array
+    win_labels: numpy.ndarray
         respective windows labels
     """
 
@@ -82,13 +82,13 @@ class LofarImgSequence(Sequence):
 
     Attributes:
 
-    self.lofar_data: numpy.array
+    self.lofar_data: numpy.ndarray
         Full lofar spectrogram where x is frequency and y is time
     
-    self.windows: array like
+    self.x_set: array like
         Array with the range of the windows to be used to mount the images
     
-    self.labels: 1-d array like
+    self.y_set: 1-d array like
         Array with the respective window label
     
     self.batch_size: int
@@ -103,21 +103,21 @@ class LofarImgSequence(Sequence):
         (shape[0], shape[1], 1)
     """
 
-    def __init__(self, lofar_data, windows, labels, batch_size=32, one_hot_encode=False, num_classes = None, convolutional_input=True):
+    def __init__(self, lofar_data, x_set, y_set, batch_size=32, one_hot_encode=False, num_classes = None, convolutional_input=True):
         self.lofar_data = lofar_data
-        self.windows = windows
-        self.labels = labels
+        self.x_set = x_set
+        self.y_set = y_set
         self.batch_size = batch_size
         self.one_hot_encode = one_hot_encode
         self.convolutional_input = convolutional_input
         if type(num_classes) == type(None):
-            self.num_classes = len(np.unique(labels))
+            self.num_classes = len(np.unique(y_set))
         else:
             self.num_classes = num_classes
 
     def __len__(self):
         """Returns the number of bacthes""" 
-        return math.ceil(len(self.windows) / self.batch_size)
+        return math.ceil(len(self.x_set) / self.batch_size)
 
     def __getitem__(self, index):
         """Gets batch at position index
@@ -131,8 +131,8 @@ class LofarImgSequence(Sequence):
             A batch
         """
 
-        batch_x = self.windows[index*self.batch_size:(index+1)*self.batch_size]
-        batch_y = np.array(self.labels[index*self.batch_size:(index+1)*self.batch_size])
+        batch_x = self.x_set[index*self.batch_size:(index+1)*self.batch_size]
+        batch_y = np.array(self.y_set[index*self.batch_size:(index+1)*self.batch_size])
         batch_x = lofar2img(self.lofar_data, batch_x)   #the batch is now the images and not the windows
 
         if self.convolutional_input:
