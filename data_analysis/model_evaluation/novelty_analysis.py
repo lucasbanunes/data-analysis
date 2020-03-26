@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.metrics import recall_score, accuracy_score, precision_score
 
 def create_threshold(quantity, 
@@ -120,7 +121,7 @@ def get_novelty_eff(results_frame,
     Return
         eff_frame: pandas.DataFrame
     """
-    y_true = np.where(results_frame.loc[:, 'Labels'].values == 'Nov', 1, 0)     #Novelty is 1 known data is 0
+    y_true = np.where(results_frame.loc[:, 'Labels'].values == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:'Classification'] == 'Nov', 1, 0)
     threshold = results_frame.loc[:, 'Classification'].columns.values.flatten()
     recall = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None, sample_weight=sample_weight), 0, novelty_matrix)
@@ -131,6 +132,23 @@ def get_novelty_eff(results_frame,
         nov_eff_frame.to_csv(filepath, index = True)
 
     return nov_eff_frame    
+
+def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), save_fig = True, filepath=''):
+    y_true = np.where(results_frame.loc[:, 'Labels'].values == 'Nov', 1, 0)     #Novelty is 1, known data is 0
+    novelty_matrix = np.where(results_frame.loc[:'Classification'] == 'Nov', 1, 0)
+    recall = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
+    fig = plt.figure(figsize=(12,3))
+    axis = fig.add_axes([0.1,0.1,0.8,0.8])
+    axis.set_title(f'NOC Curve Novelty class{nov_class_name}')
+    axis.set_ylabel('Trigger Rate')
+    axis.set_ylim(0,1)
+    axis.set_xlim(0,1)
+    axis.set_xlabel('Novelty Rate')
+    axis.plot(recall[1], recall[0])
+    if save_fig:
+        fig.savefig(filepath, dpi=200, format='png')
+    plt.close(fig)
+    return fig
                     
 def _get_novelty_matrix(predictions, threshold, classes_names):
         """
@@ -157,9 +175,9 @@ def _get_novelty_matrix(predictions, threshold, classes_names):
         """
 
         novelty_matrix = list()
-        for t in enumerate(threshold):
-            novelty_detection =  (predictions < t).all(axis=1)
-            classfication = classes_names(np.argmax(predictions, axis=1))
+        for t in threshold:
+            novelty_detection = (predictions < t).all(axis=1).flatten()
+            classfication = classes_names[np.argmax(predictions, axis=1)]
             novelty_matrix.append(np.where(novelty_detection, 'Nov', classfication))
         
         return np.column_stack(tuple(novelty_matrix))
