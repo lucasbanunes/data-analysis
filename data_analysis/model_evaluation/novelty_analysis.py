@@ -73,9 +73,11 @@ def get_results(predictions,
                 Labels: with one subcolumn L with the correct labels of the data set
         """
 
+        classes_names = list(np.array(classes_names))
+        classes_names.insert(novelty_index, 'Nov')
         classes_names = np.array(classes_names)
         novelty_matrix = _get_novelty_matrix(predictions, threshold, classes_names)
-        labels_matrix = np.insert(classes_names, novelty_index, 'Nov')[labels].reshape(-1,1)
+        labels_matrix = classes_names[labels].reshape(-1,1)
         outer_level = list()
         inner_level = list()
         for i in range(predictions.shape[-1]):
@@ -134,19 +136,19 @@ def get_novelty_eff(results_frame,
     return nov_eff_frame    
 
 def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), save_fig = True, filepath=''):
-    y_true = np.where(results_frame.loc[:, 'Labels'].values == 'Nov', 1, 0)     #Novelty is 1, known data is 0
+    y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:'Classification'] == 'Nov', 1, 0)
     recall = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
-    fig = plt.figure(figsize=(12,3))
-    axis = fig.add_axes([0.1,0.1,0.8,0.8])
-    axis.set_title(f'NOC Curve Novelty class{nov_class_name}')
+    fig, axis = plt.subplots(figsize=(12,3))
+    axis.set_title(f'NOC Curve Novelty class {nov_class_name}')
     axis.set_ylabel('Trigger Rate')
     axis.set_ylim(0,1)
     axis.set_xlim(0,1)
     axis.set_xlabel('Novelty Rate')
     axis.plot(recall[1], recall[0])
+    plt.tight_layout()
     if save_fig:
-        fig.savefig(filepath, dpi=200, format='png')
+        fig.savefig(fname=filepath, dpi=200, format='png')
     plt.close(fig)
     return fig
                     
