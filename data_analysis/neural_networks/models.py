@@ -72,6 +72,7 @@ class MultiInitSequential(Sequential):
             print('Starting the multiple initializations')
 
         for init in range(n_inits):
+
             keras.backend.clear_session()   #Clearing old models
             gc.collect()    #Collecting remanescent variables
             current_model = load_model(blank_dir)
@@ -101,15 +102,15 @@ class MultiInitSequential(Sequential):
             
             #Saving the initialization model
             if save_inits:
-                inits_dir = os.path.join(cache_dir, 'inits_model')
+                inits_dir = os.path.join(cache_dir, 'inits_models', f'init_{init}')
                 if not os.path.exists(inits_dir):
                     os.makedirs(inits_dir)
                 current_model.save(os.path.join(inits_dir, f'init_{init}_model'))
-                callback_history = open(os.path.join(inits_dir,f'init_{init}_history.txt'), 'w')
+                callback_history = open(os.path.join(inits_dir,f'init_{init}_params.txt'), 'w')
                 callback_history.write(f'History.params:\n{current_log.params}\n')
-                callback_history.write(f'History.history:\n{current_log.history}')
                 joblib.dump(current_log.params, os.path.join(inits_dir, 'callbacks_History_params.joblib'))
-                joblib.dump(current_log.history, os.path.join(inits_dir, 'callbacks_History_history.joblib'))
+                log_frame = pd.DataFrame.from_dict(current_log.history)
+                log_frame.to_csv(os.path.join(inits_dir, f'init_{init}_training_log.csv'))                
 
             #Updating the best model    
             if init == 0:
@@ -132,9 +133,10 @@ class MultiInitSequential(Sequential):
         best_init_file.close()
         callback_history = open(os.path.join(best_dir, 'best_init_history.txt'), 'w')
         callback_history.write(f'History.params:\n{best_log.params}\n')
-        callback_history.write(f'History.history:\n{best_log.history}')
-        joblib.dump(best_log.history, os.path.join(best_dir, 'callbacks_History_history.joblib'))
+        callback_history.close()
         joblib.dump(best_log.params, os.path.join(best_dir, 'callbacks_History_params.joblib'))
+        best_frame = pd.DataFrame.from_dict(best_log.history)
+        best_frame.to_csv(os.path.join(best_dir, 'best_training_log.csv'))
 
         self.load_weights(os.path.join(best_dir, 'best_weights', 'best_weights'))
 
