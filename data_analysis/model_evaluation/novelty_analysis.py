@@ -137,7 +137,7 @@ def get_novelty_eff(results_frame,
 
 def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), save_fig = True, filepath=''):
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
-    novelty_matrix = np.where(results_frame.loc[:'Classification'] == 'Nov', 1, 0)
+    novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
     recall = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
     fig, axis = plt.subplots(figsize=(12,3))
     axis.set_title(f'NOC Curve Novelty class {nov_class_name}')
@@ -146,6 +146,24 @@ def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), save_fig = Tru
     axis.set_xlim(0,1)
     axis.set_xlabel('Novelty Rate')
     axis.plot(recall[1], recall[0])
+    plt.tight_layout()
+    if save_fig:
+        fig.savefig(fname=filepath, dpi=200, format='png')
+    plt.close(fig)
+    return fig
+
+def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), save_fig=True, filepath=''):
+    y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
+    novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
+    threshold = results_frame.loc[:,'Classification'].columns.values.flatten()
+    acc = np.apply_along_axis(lambda x: accuracy_score(y_true, x), 0, novelty_matrix)
+    fig, axis = plt.subplots(figsize=(12,3))
+    axis.set_title(f'Novelty class {nov_class_name}')
+    axis.set_ylabel('Accuracy')
+    axis.set_ylim(0,1)
+    axis.set_xlim(0,1)
+    axis.set_xlabel('Threshold')
+    axis.plot(threshold, acc)
     plt.tight_layout()
     if save_fig:
         fig.savefig(fname=filepath, dpi=200, format='png')
