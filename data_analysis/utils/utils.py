@@ -17,6 +17,14 @@ def frame_from_history(self, dict_):
     return frame
 
 def reshape_conv_input(data):
+    """Returns an numpy.ndarray reshaped as an input for a convolutional layer from keras
+
+    Parameters:
+
+    data: numpy.ndarray
+        Data to be reshaped
+    """
+    
     shape = list(data.shape)
     shape.append(1)
     data.reshape(tuple(shape))
