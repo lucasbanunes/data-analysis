@@ -103,7 +103,7 @@ class LofarImgSequence(Sequence):
         (shape[0], shape[1], 1)
     """
 
-    def __init__(self, lofar_data, x_set, y_set, batch_size=32, one_hot_encode=False, num_classes = None, convolutional_input=True):
+    def __init__(self, lofar_data, x_set, y_set=None, batch_size=32, one_hot_encode=False, num_classes = None, convolutional_input=True):
         self.lofar_data = lofar_data
         self.x_set = x_set
         self.y_set = y_set
@@ -132,7 +132,6 @@ class LofarImgSequence(Sequence):
         """
 
         batch_x = self.x_set[index*self.batch_size:(index+1)*self.batch_size]
-        batch_y = np.array(self.y_set[index*self.batch_size:(index+1)*self.batch_size])
         batch_x = lofar2img(self.lofar_data, batch_x)   #the batch is now the images and not the windows
 
         if self.convolutional_input:
@@ -140,7 +139,11 @@ class LofarImgSequence(Sequence):
             shape.append(1)
             batch_x = batch_x.reshape(tuple(shape))
 
-        if self.one_hot_encode:
-            batch_y = to_categorical(batch_y, self.num_classes)
-
-        return batch_x, batch_y
+        if not self.y_set is None:
+            batch_y = np.array(self.y_set[index*self.batch_size:(index+1)*self.batch_size])
+            if self.one_hot_encode:
+                batch_y = to_categorical(batch_y, self.num_classes)
+            
+            return batch_x, batch_y
+        else:
+            return batch_x
