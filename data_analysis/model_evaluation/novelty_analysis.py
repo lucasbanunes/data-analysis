@@ -73,10 +73,10 @@ def get_results(predictions,
                 Labels: with one subcolumn L with the correct labels of the data set
         """
 
+        novelty_matrix = _get_novelty_matrix(predictions, threshold, classes_names)
         classes_names = list(np.array(classes_names))
         classes_names.insert(novelty_index, 'Nov')
         classes_names = np.array(classes_names)
-        novelty_matrix = _get_novelty_matrix(predictions, threshold, classes_names)
         labels_matrix = classes_names[labels].reshape(-1,1)
         outer_level = list()
         inner_level = list()
