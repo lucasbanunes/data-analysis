@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.keras.utils import Sequence, to_categorical
+from data_analysis.utils.utils import reshape_conv_input
 
 def lofar2img(lofar_data, windows):
     """Function that takes the windows and the lofar_data and mount the
@@ -135,9 +136,7 @@ class LofarImgSequence(Sequence):
         batch_x = lofar2img(self.lofar_data, batch_x)   #the batch is now the images and not the windows
 
         if self.convolutional_input:
-            shape = list(batch_x.shape)
-            shape.append(1)
-            batch_x = batch_x.reshape(tuple(shape))
+            batch_x = reshape_conv_input(batch_x)
 
         if not self.y_set is None:
             batch_y = np.array(self.y_set[index*self.batch_size:(index+1)*self.batch_size])
