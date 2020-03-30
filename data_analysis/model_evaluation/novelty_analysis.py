@@ -30,9 +30,7 @@ def get_results(predictions,
                 threshold,
                 classes_names,
                 novelty_index,
-                save_csv = False, 
-                filepath = './',
-                filename = None):
+                filepath = None):
         """
         Creates a pandas.DataFrame with the events as rows and the output of the neurons in the output layer, 
         the classification for each threshold and the labels as columns.
@@ -58,9 +56,6 @@ def get_results(predictions,
 
         filepath: string
             Where to save the .csv file
-
-        filename: string
-            Name of the file to be saved
 
         Returns:
 
@@ -89,16 +84,17 @@ def get_results(predictions,
         outer_level.append('Labels')
         inner_level.append('L')
         novelty_frame = pd.DataFrame(np.concatenate((predictions, novelty_matrix, labels_matrix), axis = 1), columns = pd.MultiIndex.from_arrays([outer_level, inner_level]))
-        if save_csv:
-            filepath = os.path.join(filepath, filename)
+        if not filepath is None:
+            if filepath[-4:] != '.csv':
+                filepath = os.path.join(filepath, 'results_frame.csv')
+            if not os.path.exists(filepath):
+                os.makedirs(filepath)
             novelty_frame.to_csv(filepath, index = False)
         return novelty_frame
 
 def get_novelty_eff(results_frame,
                     sample_weight=None, 
-                    save_csv = False,
-                    filepath = './',
-                    filename = None,
+                    filepath = None,
                     verbose = False):
     """
     returns a data frame with several parameters of efficiency for novelty detection
@@ -114,9 +110,6 @@ def get_novelty_eff(results_frame,
     filepath: string
         where to save the .csv file
     
-    filename: string
-        name of the file to be saved
-    
     verbose: boolean
         if true gives output of the function's activity
     
@@ -129,13 +122,15 @@ def get_novelty_eff(results_frame,
     recall = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None, sample_weight=sample_weight), 0, novelty_matrix)
     precision = np.apply_along_axis(lambda x: precision_score(y_true, x, labels = [0,1], average=None, sample_weight=sample_weight), 0, novelty_matrix)
     nov_eff_frame = pd.DataFrame(np.vstack((recall, precision)), columns = ['Recall', 'Precision'], index=pd.MuliIndex.from_product([['Known', 'Nov'], threshold], names=('Class', 'Threshold')))
-    if save_csv:
-        filepath = os.path.join(filepath, filename)
-        nov_eff_frame.to_csv(filepath, index = True)
-
+    if not filepath is None:
+        if filepath[-4:] != '.csv':
+            filepath = os.path.join(filepath, 'nov_eff_frame.csv')
+        if not os.path.exists(filepath):
+            os.makedirs(filepath)
+        nov_eff_frame.to_csv(filepath, index = False)
     return nov_eff_frame    
 
-def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), save_fig = True, filepath=''):
+def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), filepath=None):
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
     recall = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
@@ -147,12 +142,12 @@ def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), save_fig = Tru
     axis.set_xlabel('Novelty Rate')
     axis.plot(recall[1], recall[0])
     plt.tight_layout()
-    if save_fig:
+    if not filepath is None:
         fig.savefig(fname=filepath, dpi=200, format='png')
     plt.close(fig)
     return fig
 
-def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), save_fig=True, filepath=''):
+def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), save_fig=True, filepath=None):
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
     threshold = results_frame.loc[:,'Classification'].columns.values.flatten()
@@ -165,7 +160,7 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), save_fig=
     axis.set_xlabel('Threshold')
     axis.plot(threshold, acc)
     plt.tight_layout()
-    if save_fig:
+    if not filepath is None:
         fig.savefig(fname=filepath, dpi=200, format='png')
     plt.close(fig)
     return fig
