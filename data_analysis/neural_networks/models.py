@@ -1,6 +1,7 @@
 import gc
 import os
 import joblib
+from itertools import chain
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -9,6 +10,7 @@ from copy import deepcopy
 from collections import OrderedDict
 from tensorflow import keras
 from tensorflow.keras.models import Sequential, load_model, save_model
+
 
 class MultiInitSequential(Sequential):
     def __init___(self, layers=None, name=None):
@@ -34,6 +36,7 @@ class MultiInitSequential(Sequential):
             use_multiprocessing=False, 
             n_inits=1,
             init_metric='val_accuracy',
+            inits_functions=None,
             save_inits=False, 
             cache_dir=''):
         """Alias for the fit method from keras.models.Sequential with multiple initializations.
@@ -49,8 +52,13 @@ class MultiInitSequential(Sequential):
             Name of the metric mesured during the fitting of the model that will be used to select
             the best method
 
+        inits_functions: list
+            List of functions to be applied to every initialization of the model.
+            The functions must accept only one argument: one instance of this class and return None.
+
         save_inits: boolean
-            If true saves all the models initialized inside a folder called inits_model
+            If true saves all the models initialized inside a folder called inits_model and allows
+            inits_functions to be applied
 
         Returns:
         
@@ -62,7 +70,7 @@ class MultiInitSequential(Sequential):
         """
 
         #Saving the current model state to reload it multiple times
-        blank_dir = os.path.join(cache_dir, 'blank_model')
+        blank_dir = os.path.join(cache_dir, 'start_model')
         save_model(model=self, filepath=blank_dir)
 
         if not os.path.exists(cache_dir):
@@ -76,6 +84,19 @@ class MultiInitSequential(Sequential):
             keras.backend.clear_session()   #Clearing old models
             gc.collect()    #Collecting remanescent variables
             current_model = load_model(blank_dir)
+
+            #Initialiazing new weights
+            for layer in current_model.layers:
+                layer_config = layer.get_config()
+                shapes = [weight.shape for weight in layer.get_weights()]
+                param = list()
+                for i in range(len(shapes)):
+                    if i==0:
+                        initializer = getattr(keras.initializers, layer_config['kernel_initializer']['class_name']).from_config(layer_config['kernel_initializer']['config'])
+                    elif i==1:
+                        initializer = getattr(keras.initializers, layer_config['bias_initializer']['class_name']).from_config(layer_config['bias_initializer']['config'])
+                    param.append(np.array(initializer.__call__(shape=shapes[i])))
+                layer.set_weights(param)
 
             if verbose:
                 print('---------------------------------------------------------------------------------------------------')
@@ -103,8 +124,14 @@ class MultiInitSequential(Sequential):
             #Saving the initialization model
             if save_inits:
                 inits_dir = os.path.join(cache_dir, 'inits_models', f'init_{init}')
+
                 if not os.path.exists(inits_dir):
                     os.makedirs(inits_dir)
+                
+                if not inits_functions is None:
+                    for function in inits_functions:
+                        function(current_model, inits_dir)
+                
                 current_model.save(os.path.join(inits_dir, f'init_{init}_model'))
                 callback_history = open(os.path.join(inits_dir,f'init_{init}_params.txt'), 'w')
                 callback_history.write(f'History.params:\n{current_log.params}\n')
