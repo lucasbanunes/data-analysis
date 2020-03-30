@@ -1,5 +1,5 @@
 import math
-from copy import copy
+from copy import deepcopy
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
@@ -201,7 +201,7 @@ class LofarSplitter():
     
         for class_out in range(len(classes_runs)):
             for run_out in range(len(classes_runs[class_out])):
-                train_classes_runs = copy(classes_runs)
+                train_classes_runs = deepcopy(classes_runs)
                 test_run = [train_classes_runs[class_out].pop(run_out)]
 
                 yield class_out, run_out, test_run, train_classes_runs
