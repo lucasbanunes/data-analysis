@@ -4,13 +4,13 @@ def class_name(obj):
     """Returns the name of the obj's class"""
     return obj.__class__.__name__
 
-def frame_from_history(self, dict_):
+def frame_from_history(dict_):
     """Builds a pandas.DataFrame from the keras.callbacks.callbacks.History.history
     attribute"""
     
     frame = pd.DataFrame.from_dict(dict_)
-    for key in dict_.values():
-        epochs = len(key)
+    for value in dict_.values():
+        epochs = len(value)
         break
     frame.index = pd.Index(range(epochs), name='epoch')
 
