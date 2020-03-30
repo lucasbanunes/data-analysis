@@ -85,10 +85,9 @@ def get_results(predictions,
         inner_level.append('L')
         novelty_frame = pd.DataFrame(np.concatenate((predictions, novelty_matrix, labels_matrix), axis = 1), columns = pd.MultiIndex.from_arrays([outer_level, inner_level]))
         if not filepath is None:
-            if filepath[-4:] != '.csv':
-                filepath = os.path.join(filepath, 'results_frame.csv')
-            if not os.path.exists(filepath):
-                os.makedirs(filepath)
+            folder, filename = os.path.split(filepath)
+            if not os.path.exists(folder):
+                os.makedirs(folder)
             novelty_frame.to_csv(filepath, index = False)
         return novelty_frame
 
@@ -123,10 +122,9 @@ def get_novelty_eff(results_frame,
     precision = np.apply_along_axis(lambda x: precision_score(y_true, x, labels = [0,1], average=None, sample_weight=sample_weight), 0, novelty_matrix)
     nov_eff_frame = pd.DataFrame(np.vstack((recall, precision)), columns = ['Recall', 'Precision'], index=pd.MuliIndex.from_product([['Known', 'Nov'], threshold], names=('Class', 'Threshold')))
     if not filepath is None:
-        if filepath[-4:] != '.csv':
-            filepath = os.path.join(filepath, 'nov_eff_frame.csv')
-        if not os.path.exists(filepath):
-            os.makedirs(filepath)
+        folder, filename = os.path.split(filepath)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
         nov_eff_frame.to_csv(filepath, index = False)
     return nov_eff_frame    
 
@@ -147,7 +145,7 @@ def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), filepath=None)
     plt.close(fig)
     return fig
 
-def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), save_fig=True, filepath=None):
+def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=None):
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
     threshold = results_frame.loc[:,'Classification'].columns.values.flatten()
