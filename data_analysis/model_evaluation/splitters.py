@@ -61,22 +61,22 @@ class LofarSplitter():
         self.classes_runs = classes_runs
         self.window_size = window_size
         self.stride = stride
-        self.nov_cls = None
         self.classes = classes
 
-    def set_novelty(self, nov_cls):
-        if nov_cls in self.classes:
-            self.nov_cls = nov_cls
-        else:
-            raise ValueError('The given novelty class is not on the classes parameter.')
-
-    def compile(self, test_batch, train_batch, val_batch=None, val_percentage=0.0, one_hot_encode=False, convolutional_input=True):
+    def compile(self, test_batch, train_batch, val_batch=None, val_percentage=None, nov_cls=None, one_hot_encode=False, convolutional_input=True):
         self.test_batch = test_batch
         self.train_batch = train_batch
         self.val_batch = val_batch
         self.one_hot_encode = one_hot_encode
         self.convolutional_input = convolutional_input
-        self.val_percentage = float(val_percentage)
+        if val_percentage == 0:
+            self.val_percentage = None
+        else:
+            self.val_percentage = float(val_percentage)
+        if nov_cls in self.classes:
+            self.nov_cls = nov_cls
+        else:
+            raise ValueError('The given novelty class is not on the classes parameter.')
 
     def kfold_split(self, n_splits, shuffle=False, random_state=None):
         if not self._compiled():
@@ -103,36 +103,40 @@ class LofarSplitter():
                 x_fit = x_known[fit_index]
                 #Compensating from the class taken out as novelty
                 y_fit = np.where(y_known[fit_index]>self.nov_cls, y_known[fit_index]-1, y_known[fit_index])
-                num_classes = len(self.classes)-1
+                num_classes_train = len(self.classes)-1
             else:
                 x_test = x_known[test_index]
                 y_test = y_known[test_index]
                 x_fit = x_known[fit_index]
                 #No need to compensate
                 y_fit = y_known[fit_index]
-                num_classes = len(self.classes)
-
-            val_split = math.ceil(len(x_fit)*self.val_percentage)
-            x_val = x_fit[:val_split]
-            y_val = y_fit[:val_split]
-            x_train = x_fit[val_split:]
-            y_train = y_fit[val_split:]
+                num_classes_train = len(self.classes)
             
-            train_set = LofarImgSequence(self.lofar_data, x_train, y_train, self.train_batch, self.one_hot_encode, 
-                                         num_classes=num_classes, convolutional_input=self.convolutional_input)
-
             x_test_seq = LofarImgSequence(self.lofar_data, x_test, batch_size=self.test_batch, one_hot_encode=self.one_hot_encode, 
-                                          num_classes=num_classes, convolutional_input=self.convolutional_input)
+                                          num_classes=len(self.classes), convolutional_input=self.convolutional_input)
 
-            if math.isclose(self.val_percentage, 0.0):
+            if self.val_percentage is None:
+                #The percentage is treated as 0%
+                train_set = LofarImgSequence(self.lofar_data, x_fit, y_fit, self.train_batch, self.one_hot_encode, 
+                                             num_classes=num_classes_train, convolutional_input=self.convolutional_input)
+                
+                yield x_test_seq, y_test, train_set
+            else:
+                val_split = math.ceil(len(x_fit)*self.val_percentage)
+                x_val = x_fit[:val_split]
+                y_val = y_fit[:val_split]
+                x_train = x_fit[val_split:]
+                y_train = y_fit[val_split:]
+            
+                train_set = LofarImgSequence(self.lofar_data, x_train, y_train, self.train_batch, self.one_hot_encode, 
+                                            num_classes=num_classes_train, convolutional_input=self.convolutional_input)
+
                 val_set = LofarImgSequence(self.lofar_data, x_val, y_val, self.val_batch, self.one_hot_encode, 
-                                           num_classes=num_classes, convolutional_input=self.convolutional_input)
+                                           num_classes=num_classes_train, convolutional_input=self.convolutional_input)
                 
                 yield x_test_seq, y_test, val_set, train_set
-            else:
-                yield x_test_seq, y_test, train_set
 
-    def leave1run_out_split(self, test_seq = True):
+    def leave1run_out_split(self):
         if not self._compiled():
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
@@ -146,32 +150,36 @@ class LofarSplitter():
                 y_fit = np.where(y_set[y_set != self.nov_cls]>self.nov_cls, y_set[y_set != self.nov_cls] - 1, y_set[y_set != self.nov_cls])
                 x_novelty = x_set[y_set == self.nov_cls]
                 y_novelty = y_set[y_set == self.nov_cls]
-                num_classes = len(self.classes)-1
+                num_classes_train = len(self.classes)-1
             else:
                 #No need to compensate
                 x_fit = x_set
                 y_fit = y_set
-                num_classes = len(self.classes)
-
-            val_split = math.ceil(len(x_fit)*self.val_percentage)
-            x_val = x_fit[:val_split]
-            y_val = y_fit[:val_split]
-            x_train = x_fit[val_split:]
-            y_train = y_fit[val_split:]
-
-            train_set = LofarImgSequence(self.lofar_data, x_train, y_train, self.train_batch, self.one_hot_encode, 
-                                         num_classes=num_classes, convolutional_input=self.convolutional_input)
+                num_classes_train = len(self.classes)
 
             x_test_seq = LofarImgSequence(self.lofar_data, x_test, batch_size=self.test_batch, one_hot_encode=self.one_hot_encode, 
-                                          num_classes=num_classes, convolutional_input=self.convolutional_input)
+                                          num_classes=len(self.classes), convolutional_input=self.convolutional_input)
 
-            if math.isclose(self.val_percentage, 0.0):
+            if self.val_percentage is None:
+                #The percentage is treated as 0%
+                train_set = LofarImgSequence(self.lofar_data, x_fit, y_fit, self.train_batch, self.one_hot_encode, 
+                                             num_classes=num_classes_train, convolutional_input=self.convolutional_input)
+                
+                yield class_out, run_out, x_test_seq, y_test, train_set
+            else:
+                val_split = math.ceil(len(x_fit)*self.val_percentage)
+                x_val = x_fit[:val_split]
+                y_val = y_fit[:val_split]
+                x_train = x_fit[val_split:]
+                y_train = y_fit[val_split:]
+            
+                train_set = LofarImgSequence(self.lofar_data, x_train, y_train, self.train_batch, self.one_hot_encode, 
+                                            num_classes=num_classes_train, convolutional_input=self.convolutional_input)
+
                 val_set = LofarImgSequence(self.lofar_data, x_val, y_val, self.val_batch, self.one_hot_encode, 
-                                           num_classes=num_classes, convolutional_input=self.convolutional_input)
+                                           num_classes=num_classes_train, convolutional_input=self.convolutional_input)
                 
                 yield class_out, run_out, x_test_seq, y_test, val_set, train_set
-            else:
-                yield class_out, run_out, x_test_seq, y_test, train_set
 
     @staticmethod
     def leave1run_out(classes_runs):
@@ -193,9 +201,8 @@ class LofarSplitter():
     
         for class_out in range(len(classes_runs)):
             for run_out in range(len(classes_runs[class_out])):
-                test_run = np.array(classes_runs[class_out][run_out]).reshape(-1,1)
                 train_classes_runs = copy(classes_runs)
-                train_classes_runs[class_out].pop(run_out)
+                test_run = [train_classes_runs[class_out].pop(run_out)]
 
                 yield class_out, run_out, test_run, train_classes_runs
     
