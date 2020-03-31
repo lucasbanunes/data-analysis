@@ -104,7 +104,7 @@ class LofarImgSequence(Sequence):
         (shape[0], shape[1], 1)
     """
 
-    def __init__(self, lofar_data, x_set, y_set=None, batch_size=32, one_hot_encode=False, num_classes = None, convolutional_input=True):
+    def __init__(self, lofar_data, x_set, y_set=None, batch_size=32, one_hot_encode=False, num_classes = None, convolutional_input=True, **kwargs):
         self.lofar_data = lofar_data
         self.x_set = x_set
         self.y_set = y_set
@@ -146,3 +146,45 @@ class LofarImgSequence(Sequence):
             return batch_x, batch_y
         else:
             return batch_x
+
+class LofarSequence(Sequence):
+    """Child class from keras.utils.Sequence that returns each line of a lofargram
+    
+    Attributes:
+
+    self.x_set: numpy.ndarray
+        X set of the dataset
+
+    self.y_set: numpy.ndarray
+        Y set of the dataset
+
+    self.batch_size: int
+        Size of the batch
+    """
+
+    def __init__(self, x_set, y_set=None, batch_size=32, **kwargs):
+        self.x_set = x_set
+        self.y_set = y_set
+        self.batch_size = batch_size
+
+    def __len__(self):
+        """Returns the number of bacthes""" 
+        return math.ceil(len(self.x_set) / self.batch_size)
+
+    def __getitem__(self, index):
+        """Gets batch at position index
+
+        Parameters:
+
+        index: int
+            Position of the batch in the Sequence
+
+        Returns:
+            A batch
+        """
+        batch_x = self.x_set[index*self.batch_size:(index+1)*self.batch_size]
+        if self.y_set is None:
+            return batch_x
+        else:
+            batch_y = self.y_set[index*self.batch_size:(index+1)*self.batch_size]
+            return batch_x, batch_y
