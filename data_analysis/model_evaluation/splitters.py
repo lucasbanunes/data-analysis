@@ -62,8 +62,9 @@ class LofarSplitter():
         self.window_size = window_size
         self.stride = stride
         self.classes = classes
+        self.nov_cls = None
 
-    def compile(self, test_batch, train_batch, val_batch=None, val_percentage=None, nov_cls=None, one_hot_encode=False, mount_images=False, convolutional_input=True):
+    def compile(self, test_batch, train_batch, val_batch=None, val_percentage=None, one_hot_encode=False, mount_images=False, convolutional_input=True):
         self.test_batch = test_batch
         self.train_batch = train_batch
         self.val_batch = val_batch
@@ -74,6 +75,8 @@ class LofarSplitter():
             self.val_percentage = None
         else:
             self.val_percentage = float(val_percentage)
+
+    def set_novelty(self, nov_cls):
         if nov_cls in self.classes:
             self.nov_cls = nov_cls
         else:
