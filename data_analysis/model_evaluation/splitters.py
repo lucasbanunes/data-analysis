@@ -6,7 +6,7 @@ import tensorflow.keras as keras
 from tensorflow.keras.utils import Sequence, to_categorical
 from sklearn.model_selection import KFold
 import data_analysis.utils.utils as utils
-from data_analysis.utils.lofar_operators import LofarImgSequence, window_runs
+from data_analysis.utils.lofar_operators import LofarImgSequence, LofarSequence, window_runs
 
 def train_val_split(x_set, y_set, val_percentage=0.0, shuffle=True):
     """Splits a data set into train and validation subsets for fitting
@@ -63,12 +63,13 @@ class LofarSplitter():
         self.stride = stride
         self.classes = classes
 
-    def compile(self, test_batch, train_batch, val_batch=None, val_percentage=None, nov_cls=None, one_hot_encode=False, convolutional_input=True):
+    def compile(self, test_batch, train_batch, val_batch=None, val_percentage=None, nov_cls=None, one_hot_encode=False, mount_images=False, convolutional_input=True):
         self.test_batch = test_batch
         self.train_batch = train_batch
         self.val_batch = val_batch
         self.one_hot_encode = one_hot_encode
         self.convolutional_input = convolutional_input
+        self.mount_images = mount_images
         if val_percentage == 0:
             self.val_percentage = None
         else:
@@ -82,6 +83,7 @@ class LofarSplitter():
         if not self._compiled():
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
+        sequence = self._get_sequence()
         x_set, y_set = window_runs(list(zip(self.classes_runs, self.classes)), self.window_size, self.stride)
 
         if not self.nov_cls is None:
@@ -112,12 +114,12 @@ class LofarSplitter():
                 y_fit = y_known[fit_index]
                 num_classes_train = len(self.classes)
             
-            x_test_seq = LofarImgSequence(self.lofar_data, x_test, batch_size=self.test_batch, one_hot_encode=self.one_hot_encode, 
+            x_test_seq = sequence(self.lofar_data, x_test, batch_size=self.test_batch, one_hot_encode=self.one_hot_encode, 
                                           num_classes=len(self.classes), convolutional_input=self.convolutional_input)
 
             if self.val_percentage is None:
                 #The percentage is treated as 0%
-                train_set = LofarImgSequence(self.lofar_data, x_fit, y_fit, self.train_batch, self.one_hot_encode, 
+                train_set = sequence(self.lofar_data, x_fit, y_fit, self.train_batch, self.one_hot_encode, 
                                              num_classes=num_classes_train, convolutional_input=self.convolutional_input)
                 
                 yield x_test_seq, y_test, train_set
@@ -128,10 +130,10 @@ class LofarSplitter():
                 x_train = x_fit[val_split:]
                 y_train = y_fit[val_split:]
             
-                train_set = LofarImgSequence(self.lofar_data, x_train, y_train, self.train_batch, self.one_hot_encode, 
+                train_set = sequence(self.lofar_data, x_train, y_train, self.train_batch, self.one_hot_encode, 
                                             num_classes=num_classes_train, convolutional_input=self.convolutional_input)
 
-                val_set = LofarImgSequence(self.lofar_data, x_val, y_val, self.val_batch, self.one_hot_encode, 
+                val_set = sequence(self.lofar_data, x_val, y_val, self.val_batch, self.one_hot_encode, 
                                            num_classes=num_classes_train, convolutional_input=self.convolutional_input)
                 
                 yield x_test_seq, y_test, val_set, train_set
@@ -139,6 +141,8 @@ class LofarSplitter():
     def leave1run_out_split(self):
         if not self._compiled():
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
+
+        sequence = self._get_sequence()
 
         for class_out, run_out, test_run, train_classes_runs in self.leave1run_out(self.classes_runs):
             x_set, y_set = window_runs(list(zip(self.classes_runs, self.classes)), self.window_size, self.stride)
@@ -157,12 +161,12 @@ class LofarSplitter():
                 y_fit = y_set
                 num_classes_train = len(self.classes)
 
-            x_test_seq = LofarImgSequence(self.lofar_data, x_test, batch_size=self.test_batch, one_hot_encode=self.one_hot_encode, 
+            x_test_seq = sequence(self.lofar_data, x_test, batch_size=self.test_batch, one_hot_encode=self.one_hot_encode, 
                                           num_classes=len(self.classes), convolutional_input=self.convolutional_input)
 
             if self.val_percentage is None:
                 #The percentage is treated as 0%
-                train_set = LofarImgSequence(self.lofar_data, x_fit, y_fit, self.train_batch, self.one_hot_encode, 
+                train_set = sequence(self.lofar_data, x_fit, y_fit, self.train_batch, self.one_hot_encode, 
                                              num_classes=num_classes_train, convolutional_input=self.convolutional_input)
                 
                 yield class_out, run_out, x_test_seq, y_test, train_set
@@ -173,10 +177,10 @@ class LofarSplitter():
                 x_train = x_fit[val_split:]
                 y_train = y_fit[val_split:]
             
-                train_set = LofarImgSequence(self.lofar_data, x_train, y_train, self.train_batch, self.one_hot_encode, 
+                train_set = sequence(self.lofar_data, x_train, y_train, self.train_batch, self.one_hot_encode, 
                                             num_classes=num_classes_train, convolutional_input=self.convolutional_input)
 
-                val_set = LofarImgSequence(self.lofar_data, x_val, y_val, self.val_batch, self.one_hot_encode, 
+                val_set = sequence(self.lofar_data, x_val, y_val, self.val_batch, self.one_hot_encode, 
                                            num_classes=num_classes_train, convolutional_input=self.convolutional_input)
                 
                 yield class_out, run_out, x_test_seq, y_test, val_set, train_set
@@ -226,3 +230,9 @@ class LofarSplitter():
             print(f'{key} : {value}')
         if not self._compiled():
             print('The model has not yet been compiled, to compile its parameters for output use the compile method.')
+
+    def _get_sequence(self):
+        if self.mount_images:
+            return LofarImgSequence
+        else:
+            return LofarSequence
