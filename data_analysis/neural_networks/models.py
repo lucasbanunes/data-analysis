@@ -10,161 +10,257 @@ from copy import deepcopy
 from collections import OrderedDict
 from tensorflow import keras
 from tensorflow.keras.models import Sequential, load_model, save_model
+from data_analysis.utils.utils import frame_from_history
 
+class MultiInitSequential():
 
-class MultiInitSequential(Sequential):
-    def __init___(self, layers=None, name=None):
-        super(MultiInitSequential, self).__init__(layers=None, name=None)
+	def __init__(self, layers=None, name=None):
+		self._model = Sequential(layers, name)
 
-    def multi_init_fit(self, x=None, 
-            y=None, 
-            batch_size=None, 
-            epochs=1, 
-            verbose=1, 
-            callbacks=None, 
-            validation_split=0.0, 
-            validation_data=None, 
-            shuffle=True, 
-            class_weight=None, 
-            sample_weight=None, 
-            initial_epoch=0, 
-            steps_per_epoch=None, 
-            validation_steps=None, 
-            validation_freq=1, 
-            max_queue_size=10, 
-            workers=1, 
-            use_multiprocessing=False, 
-            n_inits=1,
-            init_metric='val_accuracy',
-            inits_functions=None,
-            save_inits=False, 
-            cache_dir=''):
-        """Alias for the fit method from keras.models.Sequential with multiple initializations.
-        All parameters except the ones below function exactly like the ones from the cited method
-        and are applied to every initialization.
-           
-        Parameters:
-        
-        n_inits: int
-            Number of initializations of the model
-        
-        init_metric: str
-            Name of the metric mesured during the fitting of the model that will be used to select
-            the best method
+	def add(self, layer):
+		return self._model.add(layer)
 
-        inits_functions: list
-            List of functions to be applied to every initialization of the model.
-            The functions must accept only one argument: one instance of this class and return None.
+	def compile(self, optimizer='rmsprop', loss=None, metrics=None, loss_weights=None,
+				sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
+				distribute=None, **kwargs):
 
-        save_inits: boolean
-            If true saves all the models initialized inside a folder called inits_model and allows
-            inits_functions to be applied
+		return self._model.compile(optimizer, loss, metrics, loss_weights,
+						   sample_weight_mode, weighted_metrics, target_tensors,
+						   distribute, **kwargs)
+	
+	def evaluate(self, x=None, y=None, batch_size=None, verbose=1, sample_weight=None, steps=None,
+				 callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
+		
+		return self._model.evaluate(x, y, batch_size, verbose, sample_weight, steps,
+								   callbacks, max_queue_size, workers, use_multiprocessing)
 
-        Returns:
-        
-        best_log: keras.callbacks.callbacks.History
-            History callback from the best model
-        
-        best_init: int
-            Number of the best initialization statring from zero
-        """
+	def fit(self, x=None, y=None, batch_size=None, epochs=1, verbose=1, callbacks=None,
+			validation_split=0.0, validation_data=None, shuffle=True, class_weight=None,
+			sample_weight=None, initial_epoch=0, steps_per_epoch=None,
+			validation_steps=None, validation_freq=1, max_queue_size=10, workers=1,
+			use_multiprocessing=False, **kwargs):
 
-        #Saving the current model state to reload it multiple times
-        blank_dir = os.path.join(cache_dir, 'start_model')
-        save_model(model=self, filepath=blank_dir)
+		return self._model.fit(x, y, batch_size, epochs, verbose, callbacks,
+							  validation_split, validation_data, shuffle, class_weight,
+							  sample_weight, initial_epoch, steps_per_epoch,
+							  validation_steps, validation_freq, max_queue_size, workers,
+							  use_multiprocessing, **kwargs)
 
-        if not os.path.exists(cache_dir):
-            os.makedirs(cache_dir)
+	def get_layer(self, name=None, index=None):
+		return self._model.get_layer(name, index)
 
-        if verbose:
-            print('Starting the multiple initializations')
+	def load_weights(self, filepath, by_name=False, skip_mismatch=False):
+		return self._model.load_weights(filepath, by_name, skip_mismatch)
 
-        for init in range(n_inits):
+	def pop(self):
+		return self._model.pop()
 
-            keras.backend.clear_session()   #Clearing old models
-            gc.collect()    #Collecting remanescent variables
-            current_model = load_model(blank_dir)
+	def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
+		return self._model.predict(x, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing)
+	
+	def predict_classes(self, x, batch_size=32, verbose=0):
+		return self._model.predict_classes(x, batch_size, verbose)
 
-            #Initialiazing new weights
-            for layer in current_model.layers:
-                layer_config = layer.get_config()
-                shapes = [weight.shape for weight in layer.get_weights()]
-                param = list()
-                for i in range(len(shapes)):
-                    if i==0:
-                        initializer = getattr(keras.initializers, layer_config['kernel_initializer']['class_name']).from_config(layer_config['kernel_initializer']['config'])
-                    elif i==1:
-                        initializer = getattr(keras.initializers, layer_config['bias_initializer']['class_name']).from_config(layer_config['bias_initializer']['config'])
-                    param.append(np.array(initializer.__call__(shape=shapes[i])))
-                layer.set_weights(param)
+	def predict_on_batch(self, x):
+		return self._model.predict_on_batch(x)
 
-            if verbose:
-                print('---------------------------------------------------------------------------------------------------')
-                print(f'Starting initialization {init}')
+	def predict_proba(self, x, batch_size=32, verbose=0):
+		return self._model.predict_proba(x, batch_size, verbose)
 
-            current_log = current_model.fit(x=x, 
-                                            y=y, 
-                                            batch_size=batch_size, 
-                                            epochs=epochs, 
-                                            verbose=verbose, 
-                                            callbacks=callbacks, 
-                                            validation_split=validation_split, 
-                                            validation_data=validation_data, 
-                                            shuffle=shuffle, 
-                                            class_weight=class_weight, 
-                                            sample_weight=sample_weight, 
-                                            initial_epoch=initial_epoch, 
-                                            steps_per_epoch=steps_per_epoch, 
-                                            validation_steps=validation_steps, 
-                                            validation_freq=validation_freq, 
-                                            max_queue_size=max_queue_size, 
-                                            workers=workers, 
-                                            use_multiprocessing=use_multiprocessing)
-            
-            #Saving the initialization model
-            if save_inits:
-                inits_dir = os.path.join(cache_dir, 'inits_models', f'init_{init}')
+	def reset_metrics(self):
+		return self._model.reset_metrics()
 
-                if not os.path.exists(inits_dir):
-                    os.makedirs(inits_dir)
-                
-                if not inits_functions is None:
-                    for function in inits_functions:
-                        function(current_model, inits_dir)
-                
-                current_model.save(os.path.join(inits_dir, f'init_{init}_model'))
-                callback_history = open(os.path.join(inits_dir,f'init_{init}_params.txt'), 'w')
-                callback_history.write(f'History.params:\n{current_log.params}\n')
-                joblib.dump(current_log.params, os.path.join(inits_dir, 'callbacks_History_params.joblib'))
-                log_frame = pd.DataFrame.from_dict(current_log.history)
-                log_frame.to_csv(os.path.join(inits_dir, f'init_{init}_training_log.csv'))                
+	def reset_states(self):
+		return self._model.reset_states()
 
-            #Updating the best model    
-            if init == 0:
-                best_model = current_model
-                best_log = current_log
-                best_init = 0
-            else:
-                if best_log.history[init_metric][-1] < current_log.history[init_metric][-1]:
-                    best_model = current_model
-                    best_log = current_log
-                    best_init = init
-            
-        #Saving the best model
-        best_dir = os.path.join(cache_dir, 'best')
-        if not os.path.exists(best_dir):
-            os.makedirs(best_dir)
-        best_model.save(os.path.join(best_dir, 'best_model'))
-        best_model.save_weights(os.path.join(best_dir, 'best_weights', 'best_weights'))
-        best_init_file = open(os.path.join(best_dir, f'best_init_{best_init}.txt'), 'w')
-        best_init_file.close()
-        callback_history = open(os.path.join(best_dir, 'best_init_history.txt'), 'w')
-        callback_history.write(f'History.params:\n{best_log.params}\n')
-        callback_history.close()
-        joblib.dump(best_log.params, os.path.join(best_dir, 'callbacks_History_params.joblib'))
-        best_frame = pd.DataFrame.from_dict(best_log.history)
-        best_frame.to_csv(os.path.join(best_dir, 'best_training_log.csv'))
+	def save(self, filepath, overwrite=True, include_optimizer=True, save_format=None, signatures=None, options=None):
+		return self._model.save(filepath, overwrite, include_optimizer, save_format, signatures, options)
+	
+	def save_weights(self, filepath, overwrite=True, save_format=None):
+		return self._model.save_weights(filepath, overwrite, save_format)
 
-        self.load_weights(os.path.join(best_dir, 'best_weights', 'best_weights'))
+	def summary(self, line_length=None, positions=None, print_fn=None):
+		return self._model.summary(line_length, positions, print_fn)
 
-        return best_log, best_init 
+	def test_on_batch(self, x, y=None, sample_weight=None, reset_metrics=True):
+		return self._model.test_on_batch(x, y, sample_weight, reset_metrics)
+
+	def to_json(self, **kwargs):
+		return self._model.to_json(**kwargs)
+
+	def to_yaml(self, **kwargs):
+		return self._model.to_yaml(**kwargs)
+	
+	def train_on_batch(self, x, y=None, sample_weight=None, class_weight=None, reset_metrics=True):
+		return self._model.train_on_batch(x, y, sample_weight, class_weight, reset_metrics)
+
+	def multi_init_fit(self, x=None, 
+			y=None, 
+			batch_size=None, 
+			epochs=1, 
+			verbose=1, 
+			callbacks=None, 
+			validation_split=0.0, 
+			validation_data=None, 
+			shuffle=True, 
+			class_weight=None, 
+			sample_weight=None, 
+			initial_epoch=0, 
+			steps_per_epoch=None, 
+			validation_steps=None, 
+			validation_freq=1, 
+			max_queue_size=10, 
+			workers=1, 
+			use_multiprocessing=False, 
+			n_inits=1,
+			init_metric='val_accuracy',
+			inits_functions=None,
+			save_inits=False, 
+			cache_dir=''):
+		"""Alias for the fit method from keras.models.Sequential with multiple initializations.
+		All parameters except the ones below function exactly like the ones from the cited method
+		and are applied to every initialization.
+		   
+		Parameters:
+		
+		n_inits: int
+			Number of initializations of the model
+		
+		init_metric: str
+			Name of the metric mesured during the fitting of the model that will be used to select
+			the best method
+
+		inits_functions: list
+			List of functions to be applied to every initialization of the model.
+			The functions must accept two arguments, one instance of this class and a filepath
+			to the folder output of each init, and return None.
+
+		save_inits: boolean
+			If true saves all the models initialized inside a folder called inits_model and allows
+			inits_functions to be applied
+
+		Returns:
+		
+		best_log: keras.callbacks.callbacks.History
+			History callback from the best model
+		
+		best_init: int
+			Number of the best initialization statring from zero
+		"""
+
+		if not os.path.exists(cache_dir):
+			os.makedirs(cache_dir)
+
+		#Saving the current model state to reload it multiple times
+		blank_dir = os.path.join(cache_dir, 'start_model')
+		save_model(model=self._model, filepath=blank_dir)
+
+		if verbose:
+			print('Starting the multiple initializations')
+
+		for init in range(n_inits):
+
+			keras.backend.clear_session()   #Clearing old models
+			gc.collect()    #Collecting remanescent variables
+			current_model = load_model(blank_dir)
+
+			#Initialiazing new weights
+			for layer in current_model.layers:
+				layer_config = layer.get_config()
+				shapes = [weight.shape for weight in layer.get_weights()]
+				param = list()
+				for i in range(len(shapes)):
+					if i==0:
+						initializer = getattr(keras.initializers, layer_config['kernel_initializer']['class_name']).from_config(layer_config['kernel_initializer']['config'])
+					elif i==1:
+						initializer = getattr(keras.initializers, layer_config['bias_initializer']['class_name']).from_config(layer_config['bias_initializer']['config'])
+					param.append(np.array(initializer.__call__(shape=shapes[i])))
+				layer.set_weights(param)
+
+			if verbose:
+				print('---------------------------------------------------------------------------------------------------')
+				print(f'Starting initialization {init}')
+
+			current_log = current_model.fit(x=x, 
+											y=y, 
+											batch_size=batch_size, 
+											epochs=epochs, 
+											verbose=verbose, 
+											callbacks=callbacks, 
+											validation_split=validation_split, 
+											validation_data=validation_data, 
+											shuffle=shuffle, 
+											class_weight=class_weight, 
+											sample_weight=sample_weight, 
+											initial_epoch=initial_epoch, 
+											steps_per_epoch=steps_per_epoch, 
+											validation_steps=validation_steps, 
+											validation_freq=validation_freq, 
+											max_queue_size=max_queue_size, 
+											workers=workers, 
+											use_multiprocessing=use_multiprocessing)
+			
+			#Saving the initialization model
+			if save_inits:
+				inits_dir = os.path.join(cache_dir, 'inits_models', f'init_{init}')
+				self._save_log(inits_dir, current_model, current_log)  
+				if not inits_functions is None:
+					for function in inits_functions:
+						function(current_model, inits_dir)
+
+			#Updating the best model    
+			if init == 0:
+				best_model = current_model
+				best_log = current_log
+				best_init = 0
+			else:
+				if best_log.history[init_metric][-1] < current_log.history[init_metric][-1]:
+					best_model = current_model
+					best_log = current_log
+					best_init = init
+			
+		#Saving the best model
+		best_dir = os.path.join(cache_dir, 'best')
+		self._save_log(best_dir, best_model, best_log)
+		best_init_file = open(os.path.join(best_dir, f'best_init_{best_init}.txt'), 'w')
+		best_init_file.close()
+
+		self._model.load_weights(os.path.join(best_dir, 'weights', 'weights'))
+
+		return best_log, best_init 
+
+	@staticmethod
+	def _save_log(folderpath, model, history):
+		"""Saves multiple parameters of the model state, trainning and topology and itself.
+
+		Parameters:
+
+		folderpath: string
+			String with the path to the folder to be saved the files
+
+		model: keras.Sequential
+			Keras model with parameters and itself to be saved
+
+		history: keras.callbacks.History
+			Callback to have its parameters saved
+		"""
+		if not os.path.exists(folderpath):
+			os.makedirs(folderpath)
+		model.save(os.path.join(folderpath, 'model'))
+		model.save_weights(os.path.join(folderpath, 'weights', 'weights'))
+		params_file = open(os.path.join(folderpath, 'model_params.txt'), 'w')
+		params_file.write(f'History.params:\n{history.params}\n')
+		for index, layer in zip(range(len(model.layers)), model.layers):
+			params_file.write(f'Layer {index} params:\n{layer.get_config()}\n')
+		params_file.close()
+		joblib.dump(history.params, os.path.join(folderpath, 'callbacks_History_params.joblib'))
+		best_frame = frame_from_history(history.history)
+		best_frame.to_csv(os.path.join(folderpath, 'training_log.csv'))
+
+	@classmethod
+	def load(cls, filepath, custom_objects=None, compile=True):
+		model = cls()
+		model._model = load_model(filepath, custom_objects, compile)
+
+		return model
+		
