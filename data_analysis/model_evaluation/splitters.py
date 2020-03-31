@@ -58,19 +58,21 @@ class LofarSplitter():
 
     def __init__(self, lofar_data, classes_runs, classes, window_size, stride):
         self.lofar_data = lofar_data
-        self.classes_runs = classes_runs
-        self.window_size = window_size
         self.stride = stride
         self.classes = classes
+        self._compiled = False
         self.nov_cls = None
 
-    def compile(self, test_batch, train_batch, val_batch=None, val_percentage=None, one_hot_encode=False, mount_images=False, convolutional_input=True):
+    def compile(self, window_size, stride, test_batch, train_batch, val_batch=None, val_percentage=None, one_hot_encode=False, mount_images=False, convolutional_input=True):
+        self.window_size = window_size
+        self.stride = stride
         self.test_batch = test_batch
         self.train_batch = train_batch
         self.val_batch = val_batch
         self.one_hot_encode = one_hot_encode
         self.convolutional_input = convolutional_input
         self.mount_images = mount_images
+        self._compiled = True
         if val_percentage == 0:
             self.val_percentage = None
         else:
@@ -83,7 +85,7 @@ class LofarSplitter():
             raise ValueError('The given novelty class is not on the classes parameter.')
 
     def kfold_split(self, n_splits, shuffle=False, random_state=None):
-        if not self._compiled():
+        if not self._compiled:
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
         if self.mount_images:
@@ -150,7 +152,7 @@ class LofarSplitter():
                 yield x_test_seq, y_test, val_set, train_set
 
     def leave1run_out_split(self):
-        if not self._compiled():
+        if not self._compiled:
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
         for class_out, run_out, test_run, train_classes_runs in self.leave1run_out(self.classes_runs):
@@ -229,17 +231,6 @@ class LofarSplitter():
                 test_run = train_classes_runs[class_out].pop(run_out)
 
                 yield class_out, run_out, test_run, train_classes_runs
-    
-    def _compiled(self):
-        try:
-            self.test_batch
-            self.train_batch
-            self.val_batch
-            self.val_percentage
-            self.convolutional_input
-        except NameError:
-            return False
-        return True
 
     def __print__(self):
         parameters = self.__dict__
@@ -248,5 +239,5 @@ class LofarSplitter():
         print('The current state of the model parameters are:')
         for key, value in parameters.items():
             print(f'{key} : {value}')
-        if not self._compiled():
+        if not self._compiled:
             print('The model has not yet been compiled, to compile its parameters for output use the compile method.')
