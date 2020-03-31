@@ -58,6 +58,7 @@ class LofarSplitter():
 
     def __init__(self, lofar_data, classes_runs, classes, window_size, stride):
         self.lofar_data = lofar_data
+        self.classes_runs = classes_runs
         self.stride = stride
         self.classes = classes
         self._compiled = False
