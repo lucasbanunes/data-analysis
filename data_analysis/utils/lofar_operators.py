@@ -29,23 +29,17 @@ def lofar2img(lofar_data, windows):
     
     return np.array(images)
 
-def window_runs(classes_runs, window_size, stride):
+def window_runs(runs_per_class, classes, window_size, stride):
     """Gets the windows ranges from multiple classes with multiple runs
     from a lofar spectrogram using a sliding window
 
     Parameters:
 
-    classes_runs: 2-d arraylike
-        Array with first dimension being the number of classes
-        each class has a 2-d tuple. The first element of the tuple is
-        a array with the ranges of the runs and the second element the class.
+    runs_per_classes: 2D array-like
+        Array with first dimension being the number of classes and second being the runs from that class.
 
-        Example:
-        class_1_runs = [range(0,100), range(100,200)]
-        class_3_runs =  [range(630, 730)]
-        classes_runs = [class_1_runs, class_3_runs]
-        classes = [1,3]
-        classes_runs = list(zip(classes_runs, classes))
+    classes: 1D array-like
+        Respective class for each run fom runs_per class
 
     window_size: int
         Size of the window
@@ -64,7 +58,7 @@ def window_runs(classes_runs, window_size, stride):
 
     windows = list()
     win_labels = list()
-    for runs, run_label in classes_runs:
+    for runs, run_label in zip(runs_per_class, classes):
         for run in runs:
             run_start = run[0]
             run_end = run[-1]
