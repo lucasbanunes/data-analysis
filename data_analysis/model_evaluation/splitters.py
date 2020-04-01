@@ -78,6 +78,13 @@ class LofarSplitter():
             self.val_percentage = None
         else:
             self.val_percentage = float(val_percentage)
+        if self.mount_images:
+            if self.convolutional_input:
+                self.input_shape = (window_size, self.lofar_data.shape[-1], 1)
+            else:
+                self.input_shape = (window_size, self.lofar_data.shape[-1])
+        else:
+            self.input_shape = (self.lofar_data[-1], )
 
     def set_novelty(self, nov_cls):
         if nov_cls in self.classes:
