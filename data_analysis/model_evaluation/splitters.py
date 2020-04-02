@@ -56,9 +56,9 @@ def train_val_split(x_set, y_set, val_percentage=0.0, shuffle=True):
 
 class LofarSplitter():
 
-    def __init__(self, lofar_data, classes_runs, classes, window_size, stride):
+    def __init__(self, lofar_data, runs_per_classes, classes, window_size, stride):
         self.lofar_data = lofar_data
-        self.classes_runs = classes_runs
+        self.runs_per_classes = runs_per_classes
         self.stride = stride
         self.classes = classes
         self._compiled = False
@@ -97,12 +97,12 @@ class LofarSplitter():
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
         if self.mount_images:
-            x_set, y_set = window_runs(list(zip(self.classes_runs, self.classes)), self.window_size, self.stride)
+            x_set, y_set = window_runs(self.runs_per_classes, self.classes, self.window_size, self.stride)
             sequence = LofarImgSequence
         else:
             x_set = self.lofar_data
             y_set = np.empty(len(self.lofar_data))
-            classes_range = np.array([np.hstack(tuple(runs)) for runs in self.classes_runs])
+            classes_range = np.array([np.hstack(tuple(runs)) for runs in self.runs_per_classes])
             for class_range, class_ in zip(classes_range, self.classes):
                 y_set[class_range] = class_
             sequence = LofarSequence
@@ -163,33 +163,52 @@ class LofarSplitter():
         if not self._compiled:
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
-        for class_out, run_out, test_run, train_classes_runs in self.leave1run_out(self.classes_runs):
+        if self.nov_cls is None:
+            runs_per_classes = self.runs_per_classes
+            classes = self.classes
+        else:
+            runs_per_classes = deepcopy(self.runs_per_classes)
+            novelty_runs = runs_per_classes.pop(self.nov_cls)
+            classes = np.where(self.classes != self.nov_cls)[0]
 
+        for class_out, run_out, test_run, train_runs_per_class in self.leave1run_out(runs_per_classes, classes):
+
+            if self.nov_cls is None:
+                num_classes_train = len(self.classes)
+                if self.mount_images:
+                    x_test, y_test = window_runs([[test_run]], [class_out], self.window_size, self.stride)
+                else:
+                    x_test = self.lofar_data[test_run]
+                    y_test = np.full(len(test_run), class_out)
+            else:
+                num_classes_train = len(self.classes) - 1
+                train_classes = np.where(classes>self.nov_cls, classes-1, classes)
+                if class_out>self.nov_cls:
+                    test_class = class_out - 1
+                if self.mount_images:
+                    x_known_test, y_known_test = window_runs([[test_run]], [test_class], self.window_size, self.stride)
+                    x_novelty, y_novelty = window_runs([novelty_runs], np.full(len(novelty_runs), self.nov_cls), self.window_size, self.stride)
+                    x_test = np.concatenate((x_known_test, x_novelty), axis=0)
+                    y_test = np.concatenate((y_known_test, y_novelty), axis=0)
+                else:       
+                    x_known_test = self.lofar_data[test_run]
+                    y_known_test = np.full(len(test_run), test_class)
+                    novelty_index = np.hstack(tuple(novelty_runs))
+                    x_novelty = self.lofar_data[novelty_index]
+                    y_novelty = np.full(len(novelty_index), self.nov_cls)
+            
             if self.mount_images:
-                x_set, y_set = window_runs(list(zip(self.classes_runs, self.classes)), self.window_size, self.stride)
-                x_test, y_test = window_runs([([test_run], class_out)], self.window_size, self.stride)
+                x_fit, y_fit = window_runs(train_runs_per_class, train_classes, self.window_size, self.stride)
                 sequence = LofarImgSequence
             else:
-                x_test = self.lofar_data[test_run]
-                y_test = np.full(len(test_run), class_out)
                 set_index = np.full(len(self.lofar_data), True)
                 set_index[test_run] = False
-                x_set = self.lofar_data[set_index]
-                y_set = self.lofar_data[set_index]
+                x_fit = self.lofar_data[set_index]
+                y_fit = np.empty(len(self.lofar_data))
+                for runs, train_class in zip(train_runs_per_class, train_classes):
+                    y_fit[np.hstack(tuple(runs))] = train_class
+                y_fit = y_fit[set_index]
                 sequence = LofarSequence
-
-            if not self.nov_cls is None:
-                x_fit = x_set[y_set != self.nov_cls]
-                #Compensating from the class taken out as novelty
-                y_fit = np.where(y_set[y_set != self.nov_cls]>self.nov_cls, y_set[y_set != self.nov_cls] - 1, y_set[y_set != self.nov_cls])
-                x_novelty = x_set[y_set == self.nov_cls]
-                y_novelty = y_set[y_set == self.nov_cls]
-                num_classes_train = len(self.classes)-1
-            else:
-                #No need to compensate
-                x_fit = x_set
-                y_fit = y_set
-                num_classes_train = len(self.classes)
 
             x_test_seq = sequence(lofar_data=self.lofar_data, x_set=x_test, batch_size=self.test_batch, one_hot_encode=self.one_hot_encode, 
                                           num_classes=len(self.classes), convolutional_input=self.convolutional_input)
@@ -216,29 +235,38 @@ class LofarSplitter():
                 yield class_out, run_out, x_test_seq, y_test, val_set, train_set
 
     @staticmethod
-    def leave1run_out(classes_runs):
+    def leave1run_out(runs_per_classes, classes):
         """Generator that returns the range of the run left out for test and the rest for fitting
         
         Parameters:
 
-        classes_runs: 2-d arraylike
-            Array with first dimension being the number of classes and second being the runs range.
+        runs_per_classes: 2D array-like
+            Array with first dimension being the number of classes and second being the runs from that class.
+
+        classes: 1D array-like
+            Respective class for each run fom runs_per class
 
         Yields:
 
-        test_run: numpy.ndarray with shape (1,1)
-            Array with the test run
+        class_out:
+            Class taken out
         
-        fit_classes_runs: list of lists
-            List with the rest of the runs separated by class
+        run_out: int
+            Index of the run taken out
+
+        test_run:
+            Test run
+
+        train_runs_per_class:
+            Classes for training with the same format from runs_per_class
         """
     
-        for class_out in range(len(classes_runs)):
-            for run_out in range(len(classes_runs[class_out])):
-                train_classes_runs = deepcopy(classes_runs)
-                test_run = train_classes_runs[class_out].pop(run_out)
+        for class_index, class_out in zip(range(len(runs_per_classes)), classes):
+            for run_out in range(len(runs_per_classes[class_index])):
+                train_runs_per_class = deepcopy(runs_per_classes)
+                test_run = train_runs_per_class[class_index].pop(run_out)
 
-                yield class_out, run_out, test_run, train_classes_runs
+                yield class_out, run_out, test_run, train_runs_per_class
 
     def __print__(self):
         parameters = self.__dict__
