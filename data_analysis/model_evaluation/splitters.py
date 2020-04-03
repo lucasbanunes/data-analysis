@@ -56,23 +56,23 @@ def train_val_split(x_set, y_set, val_percentage=0.0, shuffle=True):
 
 class LofarSplitter():
 
-    def __init__(self, lofar_data, runs_per_classes, classes, window_size, stride):
+    def __init__(self, lofar_data, runs_per_classes, classes):
         self.lofar_data = lofar_data
         self.runs_per_classes = runs_per_classes
-        self.stride = stride
         self.classes = classes
         self._compiled = False
         self.nov_cls = None
 
-    def compile(self, window_size, stride, test_batch, train_batch, val_batch=None, val_percentage=None, one_hot_encode=False, mount_images=False, convolutional_input=True):
-        self.window_size = window_size
-        self.stride = stride
+    def compile(self, test_batch, train_batch, val_batch=None, val_percentage=None, one_hot_encode=False, 
+                mount_images=False,  window_size=None, stride=None, convolutional_input=True):
         self.test_batch = test_batch
         self.train_batch = train_batch
         self.val_batch = val_batch
         self.one_hot_encode = one_hot_encode
         self.convolutional_input = convolutional_input
         self.mount_images = mount_images
+        self.window_size = window_size
+        self.stride = stride
         self._compiled = True
         if val_percentage == 0:
             self.val_percentage = None
@@ -84,8 +84,7 @@ class LofarSplitter():
             else:
                 self.input_shape = (window_size, self.lofar_data.shape[-1])
         else:
-            self.input_shape = (self.lofar_data[-1], )
-
+            self.input_shape = self.lofar_data[0].shape
     def set_novelty(self, nov_cls):
         if nov_cls in self.classes:
             self.nov_cls = nov_cls
