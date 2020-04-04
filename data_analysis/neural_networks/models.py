@@ -153,6 +153,7 @@ class MultiInitSequential():
 
 		#Saving the current model state to reload it multiple times
 		blank_dir = os.path.join(cache_dir, 'start_model')
+		blank_callbacks = deepcopy(callbacks)
 		save_model(model=self._model, filepath=blank_dir)
 
 		if verbose:
@@ -186,7 +187,7 @@ class MultiInitSequential():
 											batch_size=batch_size, 
 											epochs=epochs, 
 											verbose=verbose, 
-											callbacks=callbacks, 
+											callbacks=blank_callbacks, 
 											validation_split=validation_split, 
 											validation_data=validation_data, 
 											shuffle=shuffle, 
