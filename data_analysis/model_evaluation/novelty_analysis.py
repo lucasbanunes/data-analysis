@@ -42,11 +42,15 @@ def get_results(predictions,
         predictions: numpy array
             Output from the output layer
 
+        labels: numpy array
+            Correct data label.
+            The arraay must be filled with ints which each value i represents the class with name classes_names[i]
+
         threshold: numpy array
             Array with the threshold values
 
         classes_names: 1-d array like
-            Array with the name of the class obtained from each neuron
+            Array with the name of the classes
 
         novelty_index: int
             Number of the label that is treated as novelty
@@ -67,9 +71,9 @@ def get_results(predictions,
                 Classification: the model classification with the threshold as subcolumns
                 Labels: with one subcolumn L with the correct labels of the data set
         """
-
-        novelty_matrix = _get_novelty_matrix(predictions, threshold, classes_names)
         classes_names = list(np.array(classes_names))
+        classes_names.pop(novelty_index)
+        novelty_matrix = _get_novelty_matrix(predictions, threshold, np.array(classes_names))
         classes_names.insert(novelty_index, 'Nov')
         classes_names = np.array(classes_names)
         labels_matrix = classes_names[labels].reshape(-1,1)
@@ -163,7 +167,7 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
     plt.close(fig)
     return fig
                     
-def _get_novelty_matrix(predictions, threshold, classes_names):
+def _get_novelty_matrix(predictions, threshold, neuron_names):
         """
         Returns a novelty detection matrix with the classification in the cases where novelty was
         not detected with the threshold array as columns and events as rows.
@@ -178,7 +182,7 @@ def _get_novelty_matrix(predictions, threshold, classes_names):
         threshold: numpy array
             Array with the threshold values
 
-        classes_names: numpy.ndarray
+        neuron_names: numpy.ndarray
             Array with the name of the class obtained from each neuron
         
         Returns:
@@ -190,7 +194,7 @@ def _get_novelty_matrix(predictions, threshold, classes_names):
         novelty_matrix = list()
         for t in threshold:
             novelty_detection = (predictions < t).all(axis=1).flatten()
-            classfication = classes_names[np.argmax(predictions, axis=1)]
+            classfication = neuron_names[np.argmax(predictions, axis=1)]
             novelty_matrix.append(np.where(novelty_detection, 'Nov', classfication))
         
         return np.column_stack(tuple(novelty_matrix))
