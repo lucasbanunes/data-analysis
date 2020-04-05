@@ -144,6 +144,11 @@ class LofarImgSequence(Sequence):
         else:
             return batch_x
 
+    def gradient_weights(self):
+        classes, occurences = np.unique(self.y_set, axis=0, return_counts=True)
+        min_occurence = min(occurences)
+        return {int(class_): float(min_occurence / occurence) for class_, occurence in zip(classes, occurences)}
+
 class LofarSequence(Sequence):
     """Child class from keras.utils.Sequence that returns each line of a lofargram
     
@@ -170,7 +175,10 @@ class LofarSequence(Sequence):
         self.y_set = y_set
         self.batch_size = batch_size
         self.one_hot_encode = one_hot_encode
-        self.num_classes = num_classes
+        if type(num_classes) == type(None):
+            self.num_classes = len(np.unique(y_set))
+        else:
+            self.num_classes = num_classes
 
     def __len__(self):
         """Returns the number of bacthes""" 
@@ -195,3 +203,8 @@ class LofarSequence(Sequence):
             if self.one_hot_encode:
                 batch_y = to_categorical(batch_y, self.num_classes)
             return batch_x, batch_y
+
+    def gradient_weights(self):
+        classes, occurences = np.unique(self.y_set, axis=0, return_counts=True)
+        min_occurence = min(occurences)
+        return {int(class_): float(min_occurence / occurence) for class_, occurence in zip(classes, occurences)}
