@@ -174,6 +174,7 @@ class LofarSplitter():
 
             if self.nov_cls is None:
                 num_classes_train = len(self.classes)
+                train_classes=classes
                 if self.mount_images:
                     x_test, y_test = window_runs([[test_run]], [class_out], self.window_size, self.stride)
                 else:
@@ -187,14 +188,14 @@ class LofarSplitter():
                 if self.mount_images:
                     x_known_test, y_known_test = window_runs([[test_run]], [test_class], self.window_size, self.stride)
                     x_novelty, y_novelty = window_runs([novelty_runs], np.full(len(novelty_runs), self.nov_cls), self.window_size, self.stride)
-                    x_test = np.concatenate((x_known_test, x_novelty), axis=0)
-                    y_test = np.concatenate((y_known_test, y_novelty), axis=0)
                 else:       
                     x_known_test = self.lofar_data[test_run]
                     y_known_test = np.full(len(test_run), test_class)
                     novelty_index = np.hstack(tuple(novelty_runs))
                     x_novelty = self.lofar_data[novelty_index]
                     y_novelty = np.full(len(novelty_index), self.nov_cls)
+                x_test = np.concatenate((x_known_test, x_novelty), axis=0)
+                y_test = np.concatenate((y_known_test, y_novelty), axis=0)
             
             if self.mount_images:
                 x_fit, y_fit = window_runs(train_runs_per_class, train_classes, self.window_size, self.stride)
