@@ -92,6 +92,9 @@ class LofarImgSequence(Sequence):
     self.one_hot_encode: boolean
         If true the y set is one hot encoded. Default is False
 
+    self.num_classes: int
+        Number of casses to be considered for the one hot encoding
+
     self.convolutional_input: boolean
         Keras convolutional layers work with an extra dim for images in this case.
         If true the window instad of being (shape[0], shape[1]) it is
@@ -154,12 +157,20 @@ class LofarSequence(Sequence):
 
     self.batch_size: int
         Size of the batch
+    
+    self.one_hot_encode: boolean
+        If true the y set is one hot encoded. Default is False
+
+    self.num_classes: int
+        Number of casses to be considered for the one hot encoding
     """
 
-    def __init__(self, x_set, y_set=None, batch_size=32, **kwargs):
+    def __init__(self, x_set, y_set=None, batch_size=32, one_hot_encode=False, num_classes=None, **kwargs):
         self.x_set = x_set
         self.y_set = y_set
         self.batch_size = batch_size
+        self.one_hot_encode = one_hot_encode
+        self.num_classes = num_classes
 
     def __len__(self):
         """Returns the number of bacthes""" 
@@ -181,4 +192,6 @@ class LofarSequence(Sequence):
             return batch_x
         else:
             batch_y = self.y_set[index*self.batch_size:(index+1)*self.batch_size]
+            if self.one_hot_encode:
+                batch_y = to_categorical(batch_y, self.num_classes)
             return batch_x, batch_y
