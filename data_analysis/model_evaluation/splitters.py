@@ -148,16 +148,12 @@ class LofarSplitter():
                 yield x_test_seq, y_test, train_set
             else:
                 val_split = math.ceil(len(x_fit)*self.val_percentage)
-                x_val = x_fit[:val_split]
-                y_val = y_fit[:val_split]
-                x_train = x_fit[val_split:]
-                y_train = y_fit[val_split:]
-            
-                train_set = sequence(lofar_data=self.lofar_data, x_set=x_train, y_set=y_train, batch_size=self.train_batch,
+
+                train_set = sequence(lofar_data=self.lofar_data, x_set=x_fit[val_split:], y_set=y_fit[val_split:], batch_size=self.train_batch,
                                      one_hot_encode=self.one_hot_encode, num_classes=num_classes_train, convolutional_input=self.convolutional_input)
 
-                val_set = sequence(lofar_data=self.lofar_data, x_set=x_val, y_set=y_val, batch_size=self.val_batch, one_hot_encode=self.one_hot_encode, 
-                                   num_classes=num_classes_train, convolutional_input=self.convolutional_input)
+                val_set = sequence(lofar_data=self.lofar_data, x_set=x_fit[:val_split], y_set=y_fit[:val_split], batch_size=self.val_batch, 
+                                   one_hot_encode=self.one_hot_encode, num_classes=num_classes_train, convolutional_input=self.convolutional_input)
                 
                 yield x_test_seq, y_test, val_set, train_set
 
@@ -203,8 +199,10 @@ class LofarSplitter():
                     novelty_index = np.hstack(tuple(novelty_runs))
                     x_novelty = self.lofar_data[novelty_index]
                     y_novelty = np.full(len(novelty_index), self.nov_cls)
+                    del novelty_index
                 x_test = np.concatenate((x_known_test, x_novelty), axis=0)
                 y_test = np.concatenate((y_known_test, y_novelty), axis=0)
+                del x_known_test, y_known_test, x_novelty, y_novelty
             
             if self.mount_images:
                 x_fit, y_fit = window_runs(train_runs_per_class, train_classes, self.window_size, self.stride)
