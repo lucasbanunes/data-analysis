@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 def class_name(obj):
     """Returns the name of the obj's class"""
@@ -15,6 +16,18 @@ def frame_from_history(dict_):
     frame.index = pd.Index(range(epochs), name='epoch')
 
     return frame
+
+def shuffle_pair(x, y):
+    """Shuffles a pair of data"""
+    pair = list(zip(x, y))
+    np.random.shuffle(pair)
+    x=list()
+    y=list()
+    for x_value, y_value in pair:
+        x.append(x_value)
+        y.append(y_value)
+    
+    return np.array(x), np.array(y)
 
 def reshape_conv_input(data):
     """Returns an numpy.ndarray reshaped as an input for a convolutional layer from keras
