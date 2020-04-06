@@ -158,7 +158,7 @@ class LofarSplitter():
                 
                 yield x_test_seq, y_test, val_set, train_set
 
-    def leave1run_out_split(self):
+    def leave1run_out_split(self, shuffle=True):
         if not self._compiled:
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
@@ -175,6 +175,7 @@ class LofarSplitter():
             if self.nov_cls is None:
                 num_classes_train = len(self.classes)
                 train_classes=classes
+                test_class=class_out
                 if self.mount_images:
                     x_test, y_test = window_runs([[test_run]], [class_out], self.window_size, self.stride)
                 else:
@@ -185,6 +186,8 @@ class LofarSplitter():
                 train_classes = np.where(classes>self.nov_cls, classes-1, classes)
                 if class_out>self.nov_cls:
                     test_class = class_out - 1
+                else:
+                    test_class = class_out
                 if self.mount_images:
                     x_known_test, y_known_test = window_runs([[test_run]], [test_class], self.window_size, self.stride)
                     x_novelty, y_novelty = window_runs([novelty_runs], np.full(len(novelty_runs), self.nov_cls), self.window_size, self.stride)
@@ -212,6 +215,9 @@ class LofarSplitter():
 
             x_test_seq = sequence(lofar_data=self.lofar_data, x_set=x_test, batch_size=self.test_batch, one_hot_encode=self.one_hot_encode, 
                                           num_classes=len(self.classes), convolutional_input=self.convolutional_input)
+            
+            if shuffle:
+                x_fit, y_fit = utils.shuffle_pair(x_fit, y_fit)
 
             if self.val_percentage is None:
                 #The percentage is treated as 0%
