@@ -13,6 +13,7 @@ from tensorflow.keras.models import Sequential, load_model, save_model
 from data_analysis.utils.utils import frame_from_history
 
 class MultiInitSequential():
+	"""Alias for keras.Sequential model but with adittional functionalities"""
 
 	def __init__(self, layers=None, name=None):
 		self._model = Sequential(layers, name)
@@ -265,3 +266,53 @@ class MultiInitSequential():
 
 		return model
 		
+class ExpertsCommittee():
+
+	def __init__(self, classes, experts=None, wrapper=None):
+		self.set_wrapper(wrapper)
+		self.experts = dict()
+		if experts is None:
+			for class_ in classes:
+				self.experts[class_] = MultiInitSequential()
+		else:
+			self._exp_supported(experts)
+			for class_, expert in zip(classes, experts):
+				self.experts[class_] = expert
+		
+	def fit(self):
+		raise NotImplementedError
+
+	def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
+		predictions = list()
+		for expert in self.experts.values():
+			predictions.append(expert.predict(x, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
+											  max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing))
+		predictions = np.array(predictions)
+		if self.wrapper is None:
+			return predictions
+		else:
+				return wrapper.predict(predictions, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
+									   max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing))
+
+	def set_wrapper(self, wrapper):
+		if (type(wrapper) == MultiInitSequential) or (type(wrapper) == Sequential):
+			self.wrapper = wrapper
+		else:
+			raise ValueError('Support for classificators other than neural network models MultiInitSequential has not been implemented.')
+
+	def add_to_expert(self):
+		raise NotImplementedError
+
+	@staticmethod
+	def _exp_supported(experts):
+		try:
+			for expert in experts:
+				if (type(expert) == MultiInitSequential) or (type(expert) == Sequential):
+					pass
+				else:
+					ValueError('Support for experts other than neural network model MultiInitSequential has not been implemented.')
+		except TypeError:
+			if (type(expert) == MultiInitSequential) or (type(expert) == Sequential):
+				pass
+			else:
+				ValueError('Support for experts other than neural network models MultiInitSequential has not been implemented.')
