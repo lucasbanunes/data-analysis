@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.keras.utils import Sequence, to_categorical
-from data_analysis.utils.utils import reshape_conv_input
+from data_analysis.utils.utils import reshape_conv_input, shuffle_pair, DataSequence
 
 def lofar2img(lofar_data, windows):
     """Function that takes the windows and the lofar_data and mount the
@@ -71,7 +71,7 @@ def window_runs(runs_per_class, classes, window_size, stride):
     
     return np.array(windows), np.array(win_labels)
 
-class LofarImgSequence(Sequence):
+class LofarImgSequence(DataSequence):
     """Child class of keras.utils.Sequence that generates lofar images
     to get the data on demand for neural network fitting
 
@@ -102,9 +102,8 @@ class LofarImgSequence(Sequence):
     """
 
     def __init__(self, lofar_data, x_set, y_set=None, batch_size=32, one_hot_encode=False, num_classes = None, convolutional_input=True, **kwargs):
+        super().__init__(x_set, y_set)
         self.lofar_data = lofar_data
-        self.x_set = x_set
-        self.y_set = y_set
         self.batch_size = batch_size
         self.one_hot_encode = one_hot_encode
         self.convolutional_input = convolutional_input
@@ -144,12 +143,7 @@ class LofarImgSequence(Sequence):
         else:
             return batch_x
 
-    def gradient_weights(self):
-        classes, occurences = np.unique(self.y_set, axis=0, return_counts=True)
-        min_occurence = min(occurences)
-        return {int(class_): float(min_occurence / occurence) for class_, occurence in zip(classes, occurences)}
-
-class LofarSequence(Sequence):
+class LofarSequence(DataSequence):
     """Child class from keras.utils.Sequence that returns each line of a lofargram
     
     Attributes:
@@ -171,8 +165,7 @@ class LofarSequence(Sequence):
     """
 
     def __init__(self, x_set, y_set=None, batch_size=32, one_hot_encode=False, num_classes=None, **kwargs):
-        self.x_set = x_set
-        self.y_set = y_set
+        super().__init__(x_set, y_set)
         self.batch_size = batch_size
         self.one_hot_encode = one_hot_encode
         if type(num_classes) == type(None):
@@ -203,8 +196,3 @@ class LofarSequence(Sequence):
             if self.one_hot_encode:
                 batch_y = to_categorical(batch_y, self.num_classes)
             return batch_x, batch_y
-
-    def gradient_weights(self):
-        classes, occurences = np.unique(self.y_set, axis=0, return_counts=True)
-        min_occurence = min(occurences)
-        return {int(class_): float(min_occurence / occurence) for class_, occurence in zip(classes, occurences)}
