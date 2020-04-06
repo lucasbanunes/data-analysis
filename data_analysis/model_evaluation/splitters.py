@@ -1,4 +1,5 @@
 import math
+import gc
 from copy import deepcopy
 import numpy as np
 import tensorflow as tf
@@ -100,10 +101,9 @@ class LofarSplitter():
             sequence = LofarImgSequence
         else:
             x_set = self.lofar_data
-            y_set = np.empty(len(self.lofar_data))
-            classes_range = np.array([np.hstack(tuple(runs)) for runs in self.runs_per_classes])
-            for class_range, class_ in zip(classes_range, self.classes):
-                y_set[class_range] = class_
+            y_set = np.empty(len(self.lofar_data), dtype=type(self.classes[0]))
+            for runs, class_ in zip(self.runs_per_classes, self.classes):
+                y_set[np.hstack(tuple(runs))] = class_
             sequence = LofarSequence
 
         if not self.nov_cls is None:
@@ -118,6 +118,9 @@ class LofarSplitter():
         kfolder = KFold(n_splits, shuffle, random_state)
 
         for fit_index, test_index in kfolder.split(x_known, y_known):
+
+            #Collecting garbage
+            gc.collect()
 
             if not self.nov_cls is None:
                 x_test = np.concatenate((x_novelty, x_known[test_index]), axis=0)
@@ -162,6 +165,9 @@ class LofarSplitter():
         if not self._compiled:
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
+        #Collecting garbage
+        gc.collect()
+
         if self.nov_cls is None:
             runs_per_classes = self.runs_per_classes
             classes = self.classes
@@ -204,14 +210,17 @@ class LofarSplitter():
                 x_fit, y_fit = window_runs(train_runs_per_class, train_classes, self.window_size, self.stride)
                 sequence = LofarImgSequence
             else:
-                set_index = np.full(len(self.lofar_data), True)
-                set_index[test_run] = False
-                x_fit = self.lofar_data[set_index]
-                y_fit = np.empty(len(self.lofar_data))
+                fit_index = np.full(len(self.lofar_data), True)
+                fit_index[test_run] = False
+                if not self.nov_cls is None:
+                    fit_index[np.hstack(tuple(novelty_runs))] = False
+                x_fit = self.lofar_data[fit_index]
+                y_fit = np.empty(len(self.lofar_data), dtype=type(train_classes[0]))
                 for runs, train_class in zip(train_runs_per_class, train_classes):
                     y_fit[np.hstack(tuple(runs))] = train_class
-                y_fit = y_fit[set_index]
+                y_fit = y_fit[fit_index]
                 sequence = LofarSequence
+                del fit_index
 
             x_test_seq = sequence(lofar_data=self.lofar_data, x_set=x_test, batch_size=self.test_batch, one_hot_encode=self.one_hot_encode, 
                                           num_classes=len(self.classes), convolutional_input=self.convolutional_input)
