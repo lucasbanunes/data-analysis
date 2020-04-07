@@ -10,7 +10,7 @@ from copy import deepcopy
 from collections import OrderedDict
 from tensorflow import keras
 from tensorflow.keras.models import Sequential, load_model, save_model
-from data_analysis.utils.utils import frame_from_history, DataSequence
+from data_analysis.utils.utils import frame_from_history, DataSequence, gradient_weights
 
 class MultiInitSequential():
 	"""Alias for keras.Sequential model but with adittional functionalities"""
@@ -310,24 +310,57 @@ class ExpertsCommittee():
 			cache_dir='', **kwargs):
 
 			"""Trains the committee with the given parameters following the same rules
-			of MultiInitSequential.multi_init_fit"""
+			of MultiInitSequential.multi_init_fit with exception of the class_weight and sample_weight parameters handling.
+
+			Parameters:
+
+			class_weight: dict
+				Dict with the keys being 'expert' and 'wrapper' with the desired class_weight for each key.
+				Those parameters will be applied to the experts and the wrapper respectively
+				It defaults to None and when this happens the class_weight of the experts training
+				becomes the gradient weights as defined in data_analysis.utils.utils.gradient_weights
+
+
+			sample_weight: dict
+				Dict with the keys being 'expert' and 'wrapper' with the desired sample_weight for each key.
+				Those parameters will be applied to the experts and the wrapper respectively
+				It defaults to None and passes its value for both the type of classificators
+			
+			Returns:
+
+			log: dict
+				Returns a log with the logs of each model returned from multi_init_fit
+			"""
 
 			self._check_integrity()
 			experts_logs = dict()
 			for class_, expert in self.experts.items():
 				gc.collect()
+
 				cache_dir = os.path.join(cache_dir, f'{class_}_expert')
-				x_expert, y_expert, gradient_weights = self._change_to_binary(x, y, class_)
-				if class_weight is None:
-					class_weight = gradient_weights
+				
+				x_expert, y_expert= self._change_to_binary(class_, x, y)
+
+				if (class_weight is None) or (class_weight['expert'] is None):
+					cls_weight = self._gradient_weights(x_expert, y_expert)
+				else:
+					cls_weight = class_weight['expert']
+				if sample_weight is None:
+					spl_weight = None
+				else:
+					spl_weight = sample_weight['expert']
+
 				experts_logs[class_] = expert.multi_init_fit(x=x_expert, y=y_expert, batch_size=batch_size, epochs=epochs, verbose=verbose, callbacks=callbacks,
-										validation_split=validation_split, validation_data=validation_data, shuffle=shuffle, class_weight=class_weight,
-										sample_weight=sample_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
+										validation_split=validation_split, validation_data=self._exp_val(validation_data, class_), shuffle=shuffle, class_weight=cls_weight,
+										sample_weight=spl_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
 										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
 										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits, 
 										cache_dir=cache_dir, **kwargs)
+
 				cache_dir, _ = os.path.split(cache_dir)
+
 			cache_dir = os.path.join(cache_dir, 'wrapper')
+
 			if self.wrapper is None:
 				return experts_logs
 			elif type(self.wrapper) == MultiInitSequential:
@@ -395,20 +428,34 @@ class ExpertsCommittee():
 			else:
 				raise ValueError('Support for wrapper classificators other than MultiInitSequential has not been implemented.')
 
-	def _change_to_binary(self, x, y, class_):
+	def _change_to_binary(self, class_, x, y=None):
 		"""Changes the data to fit a class_ expert"""
 		if (type(x) == np.ndarray) and (type(y) == np.ndarray):
 			y = np.where(y == self.mapping(class_), 1, -1)
-			unique_classes, occurences = np.unique(y, axis=0, return_counts=True)
-			min_occurence = min(occurences)
-			gradient_weights = {int(unique_class_): float(min_occurence / occurence) for unique_class_, occurence in zip(unique_classes, occurences)}
-			return x, y, gradient_weights
-		elif DataSequence in type(x).__bases__:
+			return x, y
+		elif (DataSequence in type(x).__bases__):
 			x.apply(lambda x,y: (x,np.where(y == self.mapping(class_), 1, -1)))
-			return x, y, x.gradient_weights()
+			return x, None
 		else:
-			raise ValueError(f'{type(x)} is not supported. Use numpy arrays or a child class from data_analysis.utils.utils.DataSequence')
-			
+			raise ValueError(f'x as {type(x)} and y as {type(y)} is not supported. Use numpy arrays or a child class from data_analysis.utils.utils.DataSequence')
+	
+	def _exp_val(self, val_data, class_):
+		if val_data is None:
+			return None
+		elif type(val_data) == tuple:
+			return self._change_to_binary(class_, val_data[0], val_data[1])
+		else:
+			return self._change_to_binary(class_, val_data)[0]
+
+	@staticmethod
+	def _gradient_weights(x, y=None):
+		if (type(x) == np.ndarray) and (type(y) == np.ndarray):
+			return gradient_weights(y)
+		elif DataSequence in type(x).__bases__:
+			return x.gradient_weights()
+		else:
+			raise ValueError(f'Cannot calculate gradient_weights from x as {type(x)} and y as {type(y)}. Use numpy arrays or a child class from data_analysis.utils.utils.DataSequence')
+
 	@staticmethod
 	def _exp_supported(experts):
 		"""It checks if the passed experts are supported"""
