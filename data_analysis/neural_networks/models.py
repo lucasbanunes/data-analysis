@@ -265,13 +265,31 @@ class MultiInitSequential():
 
 	@classmethod
 	def load(cls, filepath, custom_objects=None, compile=True):
+		"""Returns a keras.Sequential model as a MultiInitSequential instance.
+		All the paramaters work as the same in keras.models.load_model.""" 
 		model = cls()
 		model._model = load_model(filepath, custom_objects, compile)
 
 		return model
 		
 class ExpertsCommittee():
+	"""Class that implements a Committe Machine as described in
+	HAYKIN, S. Neural Networks - A Comprehensive Foundation. Second edition. Pearson Prentice Hall: 1999
+	with no hierarchy.
 
+	Attributes:
+
+	experts: dict
+		Dict with the classes as keys and each one with its respective expert
+
+	self.wrapper:
+		Classificator that will take the output of all experts to give the classification of a data.
+		It defaults to None and in this case the output of the Committee is the output of each expert
+		in the order they were passed
+
+	self.mapping: function
+		Function that maps the classes to their numerical values
+	"""
 	def __init__(self, classes, mapping, experts=None, wrapper=None):
 		self.set_wrapper(wrapper)
 		self.mapping = mapping
@@ -290,6 +308,9 @@ class ExpertsCommittee():
 			validation_freq=1, max_queue_size=10, workers=1,use_multiprocessing=False,
 			n_inits=1, init_metric='val_accuracy', inits_functions=None, save_inits=False, 
 			cache_dir='', **kwargs):
+
+			"""Trains the committee with the given parameters following the same rules
+			of MultiInitSequential.multi_init_fit"""
 
 			self._check_integrity()
 			experts_logs = dict()
@@ -323,6 +344,8 @@ class ExpertsCommittee():
 				raise ValueError(f'{type(self.wrapper)} as a wrapper is not supported')
 
 	def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
+		"""Gives the output of the committee using the same parameters of MultiInitSequential.predict"""
+
 		if self.wrapper is None:
 			return self.expert_predictions(x, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing)
 		elif type(self.wrapper) == MultiInitSequential:
@@ -333,6 +356,8 @@ class ExpertsCommittee():
 			raise ValueError(f'{type(self.wrapper)} as a wrapper is not supported')
 
 	def set_wrapper(self, wrapper):
+		"""Sets the committee wrapper to the given wrapper parameter"""
+
 		if (type(wrapper) == MultiInitSequential):
 			self.wrapper = wrapper
 		else:
@@ -342,6 +367,8 @@ class ExpertsCommittee():
 		raise NotImplementedError
 
 	def expert_predictions(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
+		"""Returns the output of the expert committee"""
+		
 		self._check_integrity()
 		predictions = list()
 		for expert in self.experts.values():
