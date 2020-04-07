@@ -10,7 +10,7 @@ from copy import deepcopy
 from collections import OrderedDict
 from tensorflow import keras
 from tensorflow.keras.models import Sequential, load_model, save_model
-from data_analysis.utils.utils import frame_from_history
+from data_analysis.utils.utils import frame_from_history, DataSequence
 
 class MultiInitSequential():
 	"""Alias for keras.Sequential model but with adittional functionalities"""
@@ -272,8 +272,9 @@ class MultiInitSequential():
 		
 class ExpertsCommittee():
 
-	def __init__(self, classes, experts=None, wrapper=None):
+	def __init__(self, classes, mapping, experts=None, wrapper=None):
 		self.set_wrapper(wrapper)
+		self.mapping = mapping
 		self.experts = dict()
 		if experts is None:
 			for class_ in classes:
@@ -285,22 +286,51 @@ class ExpertsCommittee():
 		
 	def fit(self, x=None, y=None, batch_size=None, epochs=1, verbose=1, callbacks=None,
 			validation_split=0.0, validation_data=None, shuffle=True, class_weight=None,
-			sample_weight=None, initial_epoch=0, steps_per_epoch=None,
-			validation_steps=None, validation_freq=1, max_queue_size=10, workers=1,
-			use_multiprocessing=False, **kwargs):
-		raise NotImplementedError
+			sample_weight=None, initial_epoch=0, steps_per_epoch=None, validation_steps=None, 
+			validation_freq=1, max_queue_size=10, workers=1,use_multiprocessing=False,
+			n_inits=1, init_metric='val_accuracy', inits_functions=None, save_inits=False, 
+			cache_dir='', **kwargs):
+
+			self._check_integrity()
+			experts_logs = dict()
+			for class_, expert in self.experts.items():
+				gc.collect()
+				cache_dir = os.path.join(cache_dir, f'{class_}_expert')
+				x_expert, y_expert, gradient_weights = self._change_to_binary(x, y, class_)
+				if class_weight is None:
+					class_weight = gradient_weights
+				experts_logs[class_] = expert.multi_init_fit(x=x_expert, y=y_expert, batch_size=batch_size, epochs=epochs, verbose=verbose, callbacks=callbacks,
+										validation_split=validation_split, validation_data=validation_data, shuffle=shuffle, class_weight=class_weight,
+										sample_weight=sample_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
+										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
+										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits, 
+										cache_dir=cache_dir, **kwargs)
+				cache_dir, _ = os.path.split(cache_dir)
+			cache_dir = os.path.join(cache_dir, 'wrapper')
+			if self.wrapper is None:
+				return experts_logs
+			elif type(self.wrapper) == MultiInitSequential:
+				log = dict(experts=experts_logs)
+				log['wrapper'] = self.wrapper.multi_init_fit(x=self.expert_predictions(x, batch_size, verbose, None, callbacks, max_queue_size, workers, use_multiprocessing),
+										y=y, batch_size=batch_size, epochs=epochs, verbose=verbose, callbacks=callbacks,
+										validation_split=validation_split, validation_data=validation_data, shuffle=shuffle, class_weight=class_weight,
+										sample_weight=sample_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
+										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
+										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits, 
+										cache_dir=cache_dir, **kwargs)
+				return log
+			else:
+				raise ValueError(f'{type(self.wrapper)} as a wrapper is not supported')
 
 	def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
-		predictions = list()
-		for expert in self.experts.values():
-			predictions.append(expert.predict(x, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
-											  max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing))
-		predictions = np.array(predictions)
 		if self.wrapper is None:
-			return predictions
+			return self.expert_predictions(x, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing)
+		elif type(self.wrapper) == MultiInitSequential:
+				return self.wrapper.predict(self.expert_predictions(x, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing),
+											batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks,
+									   		max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing)
 		else:
-				return self.wrapper.predict(predictions, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
-									   max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing)
+			raise ValueError(f'{type(self.wrapper)} as a wrapper is not supported')
 
 	def set_wrapper(self, wrapper):
 		if (type(wrapper) == MultiInitSequential):
@@ -310,6 +340,14 @@ class ExpertsCommittee():
 
 	def add_to_expert(self):
 		raise NotImplementedError
+
+	def expert_predictions(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
+		self._check_integrity()
+		predictions = list()
+		for expert in self.experts.values():
+			predictions.append(expert.predict(x, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
+											  max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing))
+		return np.array(predictions)
 
 	def _check_integrity(self):
 		"""It checks if the classificators are correctly built"""
@@ -326,6 +364,20 @@ class ExpertsCommittee():
 					raise ValueError(f'The input shape of the wrapper must be the number of experts. Current shape {input_shape[1:]}')
 			else:
 				raise ValueError('Support for wrapper classificators other than MultiInitSequential has not been implemented.')
+
+	def _change_to_binary(self, x, y, class_):
+		"""Changes the data to fit a class_ expert"""
+		if (type(x) == np.ndarray) and (type(y) == np.ndarray):
+			y = np.where(y == self.mapping(class_), 1, -1)
+			unique_classes, occurences = np.unique(y, axis=0, return_counts=True)
+			min_occurence = min(occurences)
+			gradient_weights = {int(unique_class_): float(min_occurence / occurence) for unique_class_, occurence in zip(unique_classes, occurences)}
+			return x, y, gradient_weights
+		elif DataSequence in type(x).__bases__:
+			x.apply(lambda x,y: (x,np.where(y == self.mapping(class_), 1, -1)))
+			return x, y, x.gradient_weights()
+		else:
+			raise ValueError(f'{type(x)} is not supported. Use numpy arrays or a child class from data_analysis.utils.utils.DataSequence')
 			
 	@staticmethod
 	def _exp_supported(experts):
