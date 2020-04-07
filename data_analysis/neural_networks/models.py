@@ -95,6 +95,10 @@ class MultiInitSequential():
 	def train_on_batch(self, x, y=None, sample_weight=None, class_weight=None, reset_metrics=True):
 		return self._model.train_on_batch(x, y, sample_weight, class_weight, reset_metrics)
 
+	def layers(self):
+		"Method for accessing the layers of the model"
+		return self._model.layers
+
 	def multi_init_fit(self, x=None, 
 			y=None, 
 			batch_size=None, 
@@ -229,7 +233,7 @@ class MultiInitSequential():
 
 		self._model.load_weights(os.path.join(best_dir, 'weights', 'weights'))
 
-		return best_log, best_init 
+		return best_log, best_init
 
 	@staticmethod
 	def _save_log(folderpath, model, history):
@@ -279,7 +283,11 @@ class ExpertsCommittee():
 			for class_, expert in zip(classes, experts):
 				self.experts[class_] = expert
 		
-	def fit(self):
+	def fit(self, x=None, y=None, batch_size=None, epochs=1, verbose=1, callbacks=None,
+			validation_split=0.0, validation_data=None, shuffle=True, class_weight=None,
+			sample_weight=None, initial_epoch=0, steps_per_epoch=None,
+			validation_steps=None, validation_freq=1, max_queue_size=10, workers=1,
+			use_multiprocessing=False, **kwargs):
 		raise NotImplementedError
 
 	def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
@@ -291,28 +299,42 @@ class ExpertsCommittee():
 		if self.wrapper is None:
 			return predictions
 		else:
-				return wrapper.predict(predictions, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
-									   max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing))
+				return self.wrapper.predict(predictions, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
+									   max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing)
 
 	def set_wrapper(self, wrapper):
-		if (type(wrapper) == MultiInitSequential) or (type(wrapper) == Sequential):
+		if (type(wrapper) == MultiInitSequential):
 			self.wrapper = wrapper
 		else:
-			raise ValueError('Support for classificators other than neural network models MultiInitSequential has not been implemented.')
+			raise ValueError('Support for classificators other than MultiInitSequential has not been implemented.')
 
 	def add_to_expert(self):
 		raise NotImplementedError
 
+	def _check_integrity(self):
+		"""It checks if the classificators are correctly built"""
+		for class_, expert in self.experts.items():
+			if len(expert.layers()) == 0:
+				raise ValueError(f'Expert from class {class_} has no layers.')
+			elif expert.layers()[-1].get_config()['activation'] != 'tanh'
+				raise ValueError(f'Expert from class {class_} must have tanh as activation function on last layer.')
+
+		if (not self.wrapper is None) and (type(wrapper) == MultiInitSequential()):
+			input_shape = self.wraper.layers()[0].get_config()['batch_input_shape']
+			if (len(input_shape)>2) or (input_shape[-1] != len(list(self.experts.values()))):
+				raise ValueError(f'The input shape of the wrapper must be the number of experts. Current shape {input_shape[1:]}')
+			
 	@staticmethod
 	def _exp_supported(experts):
+		"""It checks if the passed experts are supported"""
 		try:
 			for expert in experts:
-				if (type(expert) == MultiInitSequential) or (type(expert) == Sequential):
+				if (type(expert) == MultiInitSequential):
 					pass
 				else:
-					ValueError('Support for experts other than neural network model MultiInitSequential has not been implemented.')
+					ValueError('Support for experts other than MultiInitSequential has not been implemented.')
 		except TypeError:
-			if (type(expert) == MultiInitSequential) or (type(expert) == Sequential):
+			if (type(experts) == MultiInitSequential):
 				pass
 			else:
-				ValueError('Support for experts other than neural network models MultiInitSequential has not been implemented.')
+				ValueError('Support for experts other than MultiInitSequential has not been implemented.')
