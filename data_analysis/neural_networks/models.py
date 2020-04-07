@@ -233,7 +233,7 @@ class MultiInitSequential():
 
 		self._model.load_weights(os.path.join(best_dir, 'weights', 'weights'))
 
-		return best_log, best_init
+		return best_log, best_init 
 
 	@staticmethod
 	def _save_log(folderpath, model, history):
@@ -316,13 +316,16 @@ class ExpertsCommittee():
 		for class_, expert in self.experts.items():
 			if len(expert.layers()) == 0:
 				raise ValueError(f'Expert from class {class_} has no layers.')
-			elif expert.layers()[-1].get_config()['activation'] != 'tanh'
+			elif expert.layers()[-1].get_config()['activation'] != 'tanh':
 				raise ValueError(f'Expert from class {class_} must have tanh as activation function on last layer.')
 
-		if (not self.wrapper is None) and (type(wrapper) == MultiInitSequential()):
-			input_shape = self.wraper.layers()[0].get_config()['batch_input_shape']
-			if (len(input_shape)>2) or (input_shape[-1] != len(list(self.experts.values()))):
-				raise ValueError(f'The input shape of the wrapper must be the number of experts. Current shape {input_shape[1:]}')
+		if not self.wrapper is None:
+			if type(self.wrapper) == MultiInitSequential():
+				input_shape = self.wrapper.layers()[0].get_config()['batch_input_shape']
+				if (len(input_shape)>2) or (input_shape[-1] != len(list(self.experts.values()))):
+					raise ValueError(f'The input shape of the wrapper must be the number of experts. Current shape {input_shape[1:]}')
+			else:
+				raise ValueError('Support for wrapper classificators other than MultiInitSequential has not been implemented.')
 			
 	@staticmethod
 	def _exp_supported(experts):
