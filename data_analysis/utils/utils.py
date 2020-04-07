@@ -47,14 +47,8 @@ class DataSequence(Sequence):
         return self.x_set, self.y_set
 
     def gradient_weights(self):
-        """Returns a dict with a key for each class and each value a weight for that class.
-        The weights are inversely propotional to the number of that class occurence:
-        weight = min occurences of a class/occurences of the current class
-        The dict is compatible with class_weight from keras Sequential model fit
-        """
-        classes, occurences = np.unique(self.y_set, axis=0, return_counts=True)
-        min_occurence = min(occurences)
-        return {int(class_): float(min_occurence / occurence) for class_, occurence in zip(classes, occurences)}
+        """Applies gradient_weights function"""
+        return gradient_weights(self.y_set)
 
     @staticmethod
     def _numpy_array(array):
@@ -62,6 +56,16 @@ class DataSequence(Sequence):
         if type(array) != np.ndarray and not array is None:
             array = np.array(array)
         return array
+
+def gradient_weights(y):
+    """Returns a dict with a key for each class and each value a weight for that class.
+    The weights are inversely propotional to the number of that class occurence:
+    weight = min occurences of a class/occurences of the current class
+    The dict is compatible with class_weight from keras Sequential model fit
+    """
+    classes, occurences = np.unique(y, axis=0, return_counts=True)
+    min_occurence = min(occurences)
+    return {int(class_): float(min_occurence / occurence) for class_, occurence in zip(classes, occurences)}
 
 def class_name(obj):
     """Returns the name of the obj's class"""
