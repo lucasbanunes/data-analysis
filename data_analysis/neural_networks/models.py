@@ -346,10 +346,11 @@ class ExpertsCommittee():
 	def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
 		"""Gives the output of the committee using the same parameters of MultiInitSequential.predict"""
 
+		exp_predictions = self.expert_predictions(x, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing)
 		if self.wrapper is None:
-			return self.expert_predictions(x, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing)
+			return exp_predictions
 		elif type(self.wrapper) == MultiInitSequential:
-				return self.wrapper.predict(self.expert_predictions(x, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing),
+				return self.wrapper.predict(np.array(list(exp_predictions.values())),
 											batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks,
 									   		max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing)
 		else:
@@ -370,11 +371,11 @@ class ExpertsCommittee():
 		"""Returns the output of the expert committee"""
 		
 		self._check_integrity()
-		predictions = list()
-		for expert in self.experts.values():
-			predictions.append(expert.predict(x, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
-											  max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing))
-		return np.array(predictions)
+		predictions = dict()
+		for class_, expert in self.experts.items():
+			predictions[class_] = expert.predict(x, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
+												 max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing)
+		return predictions
 
 	def _check_integrity(self):
 		"""It checks if the classificators are correctly built"""
