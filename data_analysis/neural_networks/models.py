@@ -364,8 +364,10 @@ class ExpertsCommittee():
 		else:
 			raise ValueError('Support for classificators other than MultiInitSequential has not been implemented.')
 
-	def add_to_expert(self):
-		raise NotImplementedError
+	def add_to_experts(self, layer):
+		"""Adds the given layer to all the experts"""
+		for expert in self.experts.values():
+			expert.add(layer)
 
 	def expert_predictions(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
 		"""Returns the output of the expert committee"""
