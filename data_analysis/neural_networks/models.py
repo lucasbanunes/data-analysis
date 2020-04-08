@@ -10,7 +10,7 @@ from copy import deepcopy
 from collections import OrderedDict
 from tensorflow import keras
 from tensorflow.keras.models import Sequential, load_model, save_model
-from data_analysis.utils.utils import frame_from_history, DataSequence, gradient_weights
+from data_analysis.utils.utils import frame_from_history, DataSequence, gradient_weights, _WrapperSequence
 
 class MultiInitSequential():
 	"""Alias for keras.Sequential model but with adittional functionalities"""
@@ -365,10 +365,20 @@ class ExpertsCommittee():
 				return experts_logs
 			elif type(self.wrapper) == MultiInitSequential:
 				log = dict(experts=experts_logs)
-				log['wrapper'] = self.wrapper.multi_init_fit(x=self.expert_predictions(x, batch_size, verbose, None, callbacks, max_queue_size, workers, use_multiprocessing),
-										y=y, batch_size=batch_size, epochs=epochs, verbose=verbose, callbacks=callbacks,
-										validation_split=validation_split, validation_data=validation_data, shuffle=shuffle, class_weight=class_weight,
-										sample_weight=sample_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
+				x_wrapper= self._wrapper_train(x, y, batch_size)
+
+				if (class_weight is None) or (class_weight['wrapper'] is None):
+					cls_weight = x_wrapper.gradient_weights()
+				else:
+					cls_weight = class_weight['wrapper']
+				if sample_weight is None:
+					spl_weight = None
+				else:
+					spl_weight = sample_weight['wrapper']
+
+				log['wrapper'] = self.wrapper.multi_init_fit(x=x_wrapper, y=None, batch_size=None, epochs=epochs, verbose=verbose, callbacks=callbacks,
+										validation_split=validation_split, validation_data=validation_data, shuffle=shuffle, class_weight=cls_weight,
+										sample_weight=spl_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
 										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
 										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits, 
 										cache_dir=cache_dir, **kwargs)
@@ -440,6 +450,7 @@ class ExpertsCommittee():
 			raise ValueError(f'x as {type(x)} and y as {type(y)} is not supported. Use numpy arrays or a child class from data_analysis.utils.utils.DataSequence')
 	
 	def _exp_val(self, val_data, class_):
+		"""Returns validation_data for the given expert class"""
 		if val_data is None:
 			return None
 		elif type(val_data) == tuple:
@@ -447,8 +458,19 @@ class ExpertsCommittee():
 		else:
 			return self._change_to_binary(class_, val_data)[0]
 
+	def _wrapper_train(self, x, y, batch_size):
+		"""Returns training data for the wrapper"""
+		exp_predictions = self.expert_predictions(x, batch_size)
+		if DataSequence in type(x).__bases__:
+			return _WrapperSequence(exp_predictions, x, x.batch_size)
+		elif (type(x) == np.ndarray) and (type(y) == np.ndarray):
+			return _WrapperSequence(exp_predictions, y, batch_size)
+		else:
+			raise ValueError(f'x as {type(x)} and y as {type(y)} is not supported. Use numpy arrays or a child class from data_analysis.utils.utils.DataSequence')
+
 	@staticmethod
 	def _gradient_weights(x, y=None):
+		"""Calculates gradient weights for the given data"""
 		if (type(x) == np.ndarray) and (type(y) == np.ndarray):
 			return gradient_weights(y)
 		elif DataSequence in type(x).__bases__:
