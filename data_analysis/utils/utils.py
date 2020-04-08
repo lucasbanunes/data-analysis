@@ -1,8 +1,9 @@
+import math
 import pandas as pd
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
-from tensorflow.keras.utils import Sequence
+from tensorflow.keras.utils import Sequence, to_categorical
 
 class DataSequence(Sequence):
     """Base class for Data Sequences inheriting from keras.utils.Sequence class
@@ -56,6 +57,31 @@ class DataSequence(Sequence):
         if type(array) != np.ndarray and not array is None:
             array = np.array(array)
         return array
+
+class _WrapperSequence(DataSequence):
+    """Sequence to standardize the training data to the wrapper independent of the data passed"""
+
+    def __init__(self, x_set, y_set, batch_size=32):
+        super().__init__(x_set, y_set)
+        self.batch_size = batch_size
+        if type(self.y_set) == np.ndarray:
+            self.getitem=0
+        elif DataSequence in type(self.y_set).__bases__:
+            self.getitem=1
+        else:
+            raise NotImplementedError('The given y_set is not supported')
+        
+    def __len__(self):
+        """Returns the number of bacthes""" 
+        return math.ceil(len(self.x_set) / self.batch_size)
+
+    def __getitem__(self, index):
+        batch_x = self.x_set[index*self.batch_size:(index+1)*self.batch_size]
+        if self.getitem == 0:
+            batch_y = self.y_set[index*self.batch_size:(index+1)*self.batch_size]
+            return batch_x, batch_y
+        elif self.getitem == 1:
+            return self.y_set[index]
 
 def gradient_weights(y):
     """Returns a dict with a key for each class and each value a weight for that class.
