@@ -431,7 +431,8 @@ class ExpertsCommittee():
 				raise ValueError(f'Expert from class {class_} must have tanh as activation function on last layer.')
 
 		if not self.wrapper is None:
-			if type(self.wrapper) == MultiInitSequential():
+			print(type(self.wrapper))
+			if type(self.wrapper) == MultiInitSequential:
 				input_shape = self.wrapper.layers()[0].get_config()['batch_input_shape']
 				if (len(input_shape)>2) or (input_shape[-1] != len(list(self.experts.values()))):
 					raise ValueError(f'The input shape of the wrapper must be the number of experts. Current shape {input_shape[1:]}')
@@ -441,7 +442,7 @@ class ExpertsCommittee():
 	def _change_to_binary(self, class_, x, y=None):
 		"""Changes the data to fit a class_ expert"""
 		if (type(x) == np.ndarray) and (type(y) == np.ndarray):
-			y = np.where(y == self.mapping(class_), 1, -1)
+			y = np.where(y == self.mapping(class_), 1, 0)
 			return x, y
 		elif (DataSequence in type(x).__bases__):
 			x.apply(lambda x,y: (x,np.where(y == self.mapping(class_), 1, -1)))
