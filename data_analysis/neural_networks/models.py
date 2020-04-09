@@ -1,5 +1,6 @@
 import gc
 import os
+import math
 import joblib
 from itertools import chain
 import numpy as np
@@ -333,13 +334,20 @@ class ExpertsCommittee():
 			"""
 
 			self._check_integrity()
+
 			experts_logs = dict()
 			for class_, expert in self.experts.items():
+
+				if verbose:
+					print(f'Training expert for class {class_}')
+					
 				gc.collect()
 
 				cache_dir = os.path.join(cache_dir, f'{class_}_expert')
 				
 				x_expert, y_expert= self._change_to_binary(class_, x, y)
+				print('BINARY Y')
+				print(y_expert)
 
 				if (class_weight is None) or (class_weight['expert'] is None):
 					cls_weight = self._gradient_weights(x_expert, y_expert)
@@ -359,16 +367,20 @@ class ExpertsCommittee():
 
 				cache_dir, _ = os.path.split(cache_dir)
 
-			cache_dir = os.path.join(cache_dir, 'wrapper')
-
 			if self.wrapper is None:
 				return experts_logs
 			elif type(self.wrapper) == MultiInitSequential:
+
+				if verbose:
+					print('Training wrapper')
+
+				cache_dir = os.path.join(cache_dir, 'wrapper')
 				log = dict(experts=experts_logs)
-				x_wrapper= self._wrapper_train(x, y, batch_size)
+
+				train_set, val_set = self._wrapper_train(x, y, batch_size, validation_data, validation_split)
 
 				if (class_weight is None) or (class_weight['wrapper'] is None):
-					cls_weight = x_wrapper.gradient_weights()
+					cls_weight = train_set.gradient_weights()
 				else:
 					cls_weight = class_weight['wrapper']
 				if sample_weight is None:
@@ -376,13 +388,13 @@ class ExpertsCommittee():
 				else:
 					spl_weight = sample_weight['wrapper']
 
-				log['wrapper'] = self.wrapper.multi_init_fit(x=x_wrapper, y=None, batch_size=None, epochs=epochs, verbose=verbose, callbacks=callbacks,
-										validation_split=validation_split, validation_data=validation_data, shuffle=shuffle, class_weight=cls_weight,
+				log['wrapper'] = self.wrapper.multi_init_fit(x=train_set, y=None, batch_size=None, epochs=epochs, verbose=verbose, callbacks=callbacks,
+										validation_split=0.0, validation_data=val_set, shuffle=shuffle, class_weight=cls_weight,
 										sample_weight=spl_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
 										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
 										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits, 
 										cache_dir=cache_dir, **kwargs)
-				return log
+				return log, train_set, val_set
 			else:
 				raise ValueError(f'{type(self.wrapper)} as a wrapper is not supported')
 
@@ -412,14 +424,19 @@ class ExpertsCommittee():
 		for expert in self.experts.values():
 			expert.add(layer)
 
-	def expert_predictions(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
+	def expert_predictions(self, x, as_numpy = False, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
 		"""Returns the output of the expert committee"""
 		
 		self._check_integrity()
-		predictions = dict()
-		for class_, expert in self.experts.items():
-			predictions[class_] = expert.predict(x, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
-												 max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing)
+		if as_numpy:
+			predictions = np.column_stack((expert.predict(x, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
+										   max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing)
+										   for expert in self.experts.values()))
+		else:
+			predictions = dict()
+			for class_, expert in self.experts.items(): 
+				predictions[class_] = expert.predict(x, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
+													max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing)
 		return predictions
 
 	def _check_integrity(self):
@@ -431,7 +448,6 @@ class ExpertsCommittee():
 				raise ValueError(f'Expert from class {class_} must have tanh as activation function on last layer.')
 
 		if not self.wrapper is None:
-			print(type(self.wrapper))
 			if type(self.wrapper) == MultiInitSequential:
 				input_shape = self.wrapper.layers()[0].get_config()['batch_input_shape']
 				if (len(input_shape)>2) or (input_shape[-1] != len(list(self.experts.values()))):
@@ -441,8 +457,9 @@ class ExpertsCommittee():
 
 	def _change_to_binary(self, class_, x, y=None):
 		"""Changes the data to fit a class_ expert"""
+		target_value = self.mapping(class_)
 		if (type(x) == np.ndarray) and (type(y) == np.ndarray):
-			y = np.where(y == self.mapping(class_), 1, 0)
+			y = np.array([1 if np.all(class_value == target_value) else 0 for class_value in y])
 			return x, y
 		elif (DataSequence in type(x).__bases__):
 			x.apply(lambda x,y: (x,np.where(y == self.mapping(class_), 1, -1)))
@@ -459,15 +476,41 @@ class ExpertsCommittee():
 		else:
 			return self._change_to_binary(class_, val_data)[0]
 
-	def _wrapper_train(self, x, y, batch_size):
+	def _wrapper_train(self, x, y, batch_size, val_data, val_split):
 		"""Returns training data for the wrapper"""
-		exp_predictions = self.expert_predictions(x, batch_size)
-		if DataSequence in type(x).__bases__:
-			return _WrapperSequence(exp_predictions, x, x.batch_size)
-		elif (type(x) == np.ndarray) and (type(y) == np.ndarray):
-			return _WrapperSequence(exp_predictions, y, batch_size)
+		exp_pred_array = self.expert_predictions(x,True, batch_size)
+
+		#Getting val set
+		if (val_data is None):
+			#The training data can only be a array like
+			if math.isclose(0.0, val_split):
+				val_set = None
+			else:
+				split = math.ceil(len(exp_pred_array)*val_split)
+				print(type(exp_pred_array))
+				print(exp_pred_array.shape)
+				train_set = _WrapperSequence(exp_pred_array[split:], y[split:], batch_size)
+				val_set = _WrapperSequence(exp_pred_array[:split], y[:split], batch_size)
+				return train_set, val_set
 		else:
-			raise ValueError(f'x as {type(x)} and y as {type(y)} is not supported. Use numpy arrays or a child class from data_analysis.utils.utils.DataSequence')
+			if DataSequence in type(val_data).__bases__:
+				val_exp_pred = self.expert_predictions(val_data)
+				val_set = _WrapperSequence(val_exp_pred, val_data, val_data.batch_size)
+			elif type(val_data) == tuple:
+				val_exp_pred = self.expert_predictions(val_data[0])
+				val_set = _WrapperSequence(val_exp_pred, val_data[1], val_data.batch_size)
+			else:
+				raise ValueError(f'{type(val_data)} is not supported and cannot be passed to the wrapper')
+
+		#Getting train set if not val_data is None
+		if DataSequence in type(x).__bases__:
+			train_set =  _WrapperSequence(exp_pred_array, x, x.batch_size)
+		elif (type(x) == np.ndarray) and (type(y) == np.ndarray):
+			train_set = _WrapperSequence(exp_pred_array, y, batch_size)
+		else:
+			raise ValueError(f'{type(x)} as x set and {type(y)} as y set is not supported and cannot be passed to the wrapper')
+
+		return train_set, val_set
 
 	@staticmethod
 	def _gradient_weights(x, y=None):
