@@ -88,7 +88,20 @@ def gradient_weights(y):
     The weights are inversely propotional to the number of that class occurence:
     weight = min occurences of a class/occurences of the current class
     The dict is compatible with class_weight from keras Sequential model fit
+
+    Parameters:
+
+    y: numpy array
+        Correct labels of a set
     """
+    ndim = len(y.shape)
+    if ndim == 1:
+        pass
+    elif ndim ==2:
+        y = np.argmax(y, axis=1)
+    else:
+        raise ValueError(f'Could not retrive gradient weights from array with dimension {ndim}')
+    
     classes, occurences = np.unique(y, axis=0, return_counts=True)
     min_occurence = min(occurences)
     return {int(class_): float(min_occurence / occurence) for class_, occurence in zip(classes, occurences)}
