@@ -2,6 +2,7 @@ import gc
 import os
 import math
 import joblib
+import warnings
 from itertools import chain
 import numpy as np
 import pandas as pd
@@ -317,15 +318,15 @@ class ExpertsCommittee():
 
 			class_weight: dict
 				Dict with the keys being 'expert' and 'wrapper' with the desired class_weight for each key.
-				Those parameters will be applied to the experts and the wrapper respectively
-				It defaults to None and when this happens the class_weight of the experts training
-				becomes the gradient weights as defined in data_analysis.utils.utils.gradient_weights
-
+				Those parameters will be applied to the experts and the wrapper respectively.
+				The string 'gradient_weights' can be passed as a value. This will make the class_weight be 
+				evaluated by data_analysis.utils.utils.gradient_weights.
+				Defaults to None.
 
 			sample_weight: dict
 				Dict with the keys being 'expert' and 'wrapper' with the desired sample_weight for each key.
-				Those parameters will be applied to the experts and the wrapper respectively
-				It defaults to None and passes its value for both the type of classificators
+				Those parameters will be applied to the experts and the wrapper respectively.
+				Defaults to None.
 			
 			Returns:
 
@@ -346,13 +347,11 @@ class ExpertsCommittee():
 				cache_dir = os.path.join(cache_dir, f'{class_}_expert')
 				
 				train_expert = self._change_to_binary(class_, x)
-				print(len(train_expert))
-				for _, labels in train_expert:
-					if np.all(labels == 0, axis=0):
-						print('ONLY ZEROS')
 				val_expert = self._change_to_binary(class_, validation_data)
 
-				if (class_weight is None) or (class_weight['expert'] is None):
+				if class_weight is None:
+					cls_weight = None
+				elif (class_weight == 'gradient_weights') or (class_weight['expert'] == 'gradient_weights'):
 					cls_weight = train_expert.gradient_weights()
 				else:
 					cls_weight = class_weight['expert']
@@ -383,17 +382,20 @@ class ExpertsCommittee():
 
 				train_set, val_set = self._wrapper_set(x, validation_data)
 
-				if (class_weight is None) or (class_weight['wrapper'] is None):
-					cls_weight = train_set.gradient_weights()
+				if class_weight is None:
+					cls_weight = None
+				elif (class_weight == 'gradient_weights') or (class_weight['wrapper'] == 'gradient_weights'):
+					cls_weight = train_expert.gradient_weights()						
 				else:
 					cls_weight = class_weight['wrapper']
+
 				if sample_weight is None:
 					spl_weight = None
 				else:
 					spl_weight = sample_weight['wrapper']
 
 				log['wrapper'] = self.wrapper.multi_init_fit(x=train_set, y=None, batch_size=None, epochs=epochs, verbose=verbose, callbacks=callbacks,
-										validation_split=0.0, validation_data=val_set, shuffle=shuffle, class_weight=None,
+										validation_split=0.0, validation_data=val_set, shuffle=shuffle, class_weight=cls_weight,
 										sample_weight=spl_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
 										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
 										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits, 
@@ -467,7 +469,7 @@ class ExpertsCommittee():
 			data_seq.apply(lambda x,y: (x,np.array([1 if np.all(class_value == target_value) else 0 for class_value in y])))
 			return data_seq
 		else:
-			raise ValueError(f'{type(x)}is not supported. Use a child class from data_analysis.utils.utils.DataSequence')
+			raise ValueError(f'{type(x)} is not supported. Use a child class from data_analysis.utils.utils.DataSequence')
 
 	def _wrapper_set(self, x, val_data):
 		"""Returns training data for the wrapper"""
