@@ -405,13 +405,13 @@ class ExpertsCommittee():
 				raise ValueError(f'{type(self.wrapper)} as a wrapper is not supported')
 
 	def predict(self, x, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
-		"""Gives the output of the committee using the same parameters of MultiInitSequential.predict"""
+		"""Gives the output of the committee using the same parameters of MultiInitSequential.predict
+		If no wrapper is defined this method returns expert_predictions method with as_numpy dfinied as False."""
 
-		exp_predictions = self.expert_predictions(x, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing)
 		if self.wrapper is None:
-			return exp_predictions
+			return self.expert_predictions(x, False, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing)
 		elif type(self.wrapper) == MultiInitSequential:
-				return self.wrapper.predict(np.array(list(exp_predictions.values())),
+				return self.wrapper.predict(self.expert_predictions(x, True, batch_size, verbose, steps, callbacks, max_queue_size, workers, use_multiprocessing),
 											batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks,
 									   		max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing)
 		else:
@@ -426,12 +426,22 @@ class ExpertsCommittee():
 			raise ValueError('Support for classificators other than MultiInitSequential has not been implemented.')
 
 	def add_to_experts(self, layer):
-		"""Adds the given layer to all the experts"""
+		"""Adds the given keras layer to all the experts"""
 		for expert in self.experts.values():
 			expert.add(layer)
 
 	def expert_predictions(self, x, as_numpy = False, batch_size=None, verbose=0, steps=None, callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
-		"""Returns the output of the expert committee"""
+		"""Returns the output of the expert committee.
+		All the parameters work as in keras package excpet for:
+		
+		Parameters:
+		
+		as_numpy: bool
+			If False this method returns a dict with the keys as the classes and
+			with the values as the outputs of the respective expert.
+			If True this method returns a numpy array with the ouput of each expert as columns
+			in the order of the dict.
+		"""
 		
 		self._check_integrity()
 		if as_numpy:
