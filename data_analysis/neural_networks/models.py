@@ -293,6 +293,23 @@ class ExpertsCommittee():
 		Function that maps the classes to their numerical values
 	"""
 	def __init__(self, classes, mapping, experts=None, wrapper=None):
+		"""
+		Parameters:
+
+		classes: iterable
+			Iterable with the classes as each item
+		
+		mapping: function
+			Function that maps each class to it value to be evaluated by the network
+		
+		experts: iterable
+			Iterable with each item being a MultiInitSequential model.
+			Defaults to none, in this case each class recieves a blank
+			MultiInitSequential model
+
+		wrapper:
+			Classificator to be used to process the output of the experts
+		"""
 		self.set_wrapper(wrapper)
 		self.mapping = mapping
 		self.experts = dict()
@@ -425,6 +442,10 @@ class ExpertsCommittee():
 		else:
 			raise ValueError('Support for classificators other than MultiInitSequential has not been implemented.')
 
+	def set_mapping(self, mapping):
+		"""Sets the committee's current mapping function"""
+		self.mapping = mapping
+
 	def add_to_experts(self, layer):
 		"""Adds the given keras layer to all the experts"""
 		for expert in self.experts.values():
@@ -515,7 +536,7 @@ class ExpertsCommittee():
 					pass
 				else:
 					ValueError('Support for experts other than MultiInitSequential has not been implemented.')
-		except TypeError:
+		except TypeError:	#One expert was passed
 			if (type(experts) == MultiInitSequential):
 				pass
 			else:
