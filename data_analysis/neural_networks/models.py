@@ -121,6 +121,7 @@ class MultiInitSequential():
 			use_multiprocessing=False, 
 			n_inits=1,
 			init_metric='val_accuracy',
+			mode = 'auto',
 			inits_functions=None,
 			save_inits=False, 
 			cache_dir=''):
@@ -160,16 +161,15 @@ class MultiInitSequential():
 
 		#Saving the current model state to reload it multiple times
 		blank_dir = os.path.join(cache_dir, 'start_model')
-		blank_callbacks = deepcopy(callbacks)
 		save_model(model=self._model, filepath=blank_dir)
+
+		#Joining the callbacks
 
 		if verbose:
 			print('Starting the multiple initializations')
 
 		for init in range(n_inits):
 
-			keras.backend.clear_session()   #Clearing old models
-			gc.collect()    #Collecting remanescent variables
 			current_model = load_model(blank_dir)
 
 			#Initialiazing new weights
@@ -185,6 +185,19 @@ class MultiInitSequential():
 					param.append(np.array(initializer.__call__(shape=shapes[i])))
 				layer.set_weights(param)
 
+			#Setting the callbacks
+			inits_dir = os.path.join(cache_dir, 'inits_models', f'init_{init}')
+			ck_dir = os.path.join(inits_dir, 'models')
+			checkpoint = keras.callbacks.ModelCheckpoint(filepath=os.path.join(ck_dir, 'epoch_{epoch}'), 
+														 save_best_only=True, 
+														 monitor=init_metric, 
+														 verbose=1, mode=mode)
+			if callbacks is None:
+				init_callbacks = [checkpoint]
+			else:
+				init_callbacks = deepcopy(callbacks)
+				init_callbacks.append(checkpoint)
+
 			if verbose:
 				print('---------------------------------------------------------------------------------------------------')
 				print(f'Starting initialization {init}')
@@ -194,7 +207,7 @@ class MultiInitSequential():
 											batch_size=batch_size, 
 											epochs=epochs, 
 											verbose=verbose, 
-											callbacks=blank_callbacks, 
+											callbacks=init_callbacks, 
 											validation_split=validation_split, 
 											validation_data=validation_data, 
 											shuffle=shuffle, 
@@ -207,35 +220,39 @@ class MultiInitSequential():
 											max_queue_size=max_queue_size, 
 											workers=workers, 
 											use_multiprocessing=use_multiprocessing)
+
+			current_best_epoch = int(os.listdir(ck_dir)[-1].split('_')[-1])
+			current_best_metric = current_log.history[init_metric][current_best_epoch-1]
 			
 			#Saving the initialization model
 			if save_inits:
-				inits_dir = os.path.join(cache_dir, 'inits_models', f'init_{init}')
-				self._save_log(inits_dir, current_model, current_log)  
+				self._save_log(os.path.join(inits_dir, 'end_state'), current_model, current_log)  
 				if not inits_functions is None:
 					for function in inits_functions:
 						function(current_model, inits_dir)
 
 			#Updating the best model    
-			if init == 0:
-				best_model = current_model
+			if init == 0 or global_best_metric < current_best_metric:
+				best_model = os.path.join(ck_dir, os.listdir(ck_dir)[-1])
 				best_log = current_log
-				best_init = 0
-			else:
-				if best_log.history[init_metric][-1] < current_log.history[init_metric][-1]:
-					best_model = current_model
-					best_log = current_log
-					best_init = init
+				best_init = init
+				global_best_metric = current_best_metric
+				global_best_epoch = current_best_epoch
+
+			del current_model
+			gc.collect()    #Collecting remanescent variables
+			keras.backend.clear_session()   #Clearing old models
+
+		#Defining the best model
+		self._model = load_model(best_model)
 			
 		#Saving the best model
 		best_dir = os.path.join(cache_dir, 'best')
-		self._save_log(best_dir, best_model, best_log)
+		self._save_log(best_dir, self._model, best_log)
 		best_init_file = open(os.path.join(best_dir, f'best_init_{best_init}.txt'), 'w')
 		best_init_file.close()
 
-		self._model.load_weights(os.path.join(best_dir, 'weights', 'weights'))
-
-		return best_log, best_init 
+		return dict(history_callback=best_log, best_init=best_init, best_epoch=global_best_epoch) 
 
 	@staticmethod
 	def _save_log(folderpath, model, history):
