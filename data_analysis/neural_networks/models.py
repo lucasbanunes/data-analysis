@@ -163,7 +163,10 @@ class MultiInitSequential():
 		blank_dir = os.path.join(cache_dir, 'start_model')
 		save_model(model=self._model, filepath=blank_dir)
 
-		#Joining the callbacks
+		#Removing the current model to avoid conflicts with the multiple initializations
+		del self._model
+		gc.collect()
+		keras.backend.clear_session()
 
 		if verbose:
 			print('Starting the multiple initializations')
