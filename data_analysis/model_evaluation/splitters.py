@@ -170,32 +170,27 @@ class LofarSplitter():
         else:
             runs_per_classes = deepcopy(self.runs_per_classes)
             novelty_runs = runs_per_classes.pop(self.nov_cls)
-            classes = np.where(self.classes != self.nov_cls)[0]
+            classes = self.classes[self.classes != self.nov_cls]
 
         for class_out, run_out, test_run, train_runs_per_class in self.leave1run_out(runs_per_classes, classes):
 
             if self.nov_cls is None:
                 num_classes_train = len(self.classes)
                 train_classes=classes
-                test_class=class_out
                 if self.mount_images:
                     x_test, y_test = window_runs([[test_run]], [class_out], self.window_size, self.stride)
                 else:
                     x_test = self.lofar_data[test_run]
                     y_test = np.full(len(test_run), class_out)
             else:
-                num_classes_train = len(self.classes) - 1
+                num_classes_train = len(classes)
                 train_classes = np.where(classes>self.nov_cls, classes-1, classes)
-                if class_out>self.nov_cls:
-                    test_class = class_out - 1
-                else:
-                    test_class = class_out
                 if self.mount_images:
-                    x_known_test, y_known_test = window_runs([[test_run]], [test_class], self.window_size, self.stride)
+                    x_known_test, y_known_test = window_runs([[test_run]], [class_out], self.window_size, self.stride)
                     x_novelty, y_novelty = window_runs([novelty_runs], np.full(len(novelty_runs), self.nov_cls), self.window_size, self.stride)
                 else:       
                     x_known_test = self.lofar_data[test_run]
-                    y_known_test = np.full(len(test_run), test_class)
+                    y_known_test = np.full(len(test_run), class_out)
                     novelty_index = np.hstack(tuple(novelty_runs))
                     x_novelty = self.lofar_data[novelty_index]
                     y_novelty = np.full(len(novelty_index), self.nov_cls)
