@@ -1,9 +1,10 @@
 import gc
 import os
 import math
-import joblib
+import json
+import time
+import shutil
 import warnings
-from itertools import chain
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -12,7 +13,7 @@ from copy import deepcopy
 from collections import OrderedDict
 from tensorflow import keras
 from tensorflow.keras.models import Sequential, load_model, save_model
-from data_analysis.utils.utils import frame_from_history, DataSequence, gradient_weights, _WrapperSequence
+from data_analysis.utils.utils import frame_from_history, DataSequence, gradient_weights, _WrapperSequence, cast_dict_to_python
 
 class MultiInitSequential():
 	"""Alias for keras.Sequential model but with adittional functionalities"""
@@ -156,6 +157,9 @@ class MultiInitSequential():
 			Number of the best initialization statring from zero
 		"""
 
+		start_time = time.time()
+		inits_time = list()
+
 		if not os.path.exists(cache_dir):
 			os.makedirs(cache_dir)
 
@@ -171,7 +175,9 @@ class MultiInitSequential():
 		if verbose:
 			print('Starting the multiple initializations')
 
-		for init in range(n_inits):
+		for init in range(1, n_inits+1):
+
+			init_start = time.time()
 
 			current_model = load_model(blank_dir)
 
@@ -205,7 +211,7 @@ class MultiInitSequential():
 				print('---------------------------------------------------------------------------------------------------')
 				print(f'Starting initialization {init}')
 
-			current_log = current_model.fit(x=x, 
+			init_callback = current_model.fit(x=x, 
 											y=y, 
 											batch_size=batch_size, 
 											epochs=epochs, 
@@ -224,66 +230,63 @@ class MultiInitSequential():
 											workers=workers, 
 											use_multiprocessing=use_multiprocessing)
 
-			current_best_epoch = int(os.listdir(ck_dir)[-1].split('_')[-1])
-			current_best_metric = current_log.history[init_metric][current_best_epoch-1]
-			
-			#Saving the initialization model
+			init_best_epoch = int(os.listdir(ck_dir)[-1].split('_')[-1])
+			init_best_metric = init_callback.history[init_metric][init_best_epoch-1]
+			init_best_model = os.path.join(ck_dir, os.listdir(ck_dir)[-1])
+
 			if save_inits:
-				self._save_log(os.path.join(inits_dir, 'end_state'), current_model, current_log)  
-				if not inits_functions is None:
-					for function in inits_functions:
-						function(current_model, inits_dir)
+				self._save_history(inits_dir, init_callback)
+			
+			#Executing the functions
+			if not inits_functions is None:
+				for function in inits_functions:
+					function(current_model, inits_dir)
 
 			#Updating the best model    
-			if init == 0 or global_best_metric < current_best_metric:
-				best_model = os.path.join(ck_dir, os.listdir(ck_dir)[-1])
-				best_log = current_log
+			if init == 1 or best_metric < init_best_metric:
+				best_model = init_best_model
+				best_callback = init_callback
 				best_init = init
-				global_best_metric = current_best_metric
-				global_best_epoch = current_best_epoch
+				best_metric = init_best_metric
+				best_epoch = init_best_epoch
 
 			del current_model
 			gc.collect()    #Collecting remanescent variables
-			keras.backend.clear_session()   #Clearing old models
+			keras.backend.clear_session()   #Restarting the graph
+
+			init_end = time.time()
+
+			inits_time.append(round((init_end-init_start), 2))
 
 		#Defining the best model
 		self._model = load_model(best_model)
-			
-		#Saving the best model
-		best_dir = os.path.join(cache_dir, 'best')
-		self._save_log(best_dir, self._model, best_log)
-		best_init_file = open(os.path.join(best_dir, f'best_init_{best_init}.txt'), 'w')
-		best_init_file.close()
+		best_dir = os.path.join(cache_dir, 'best_model')
+		self._model.save(os.path.join(best_dir, 'model'))
 
-		return dict(history_callback=best_log, best_init=best_init, best_epoch=global_best_epoch) 
+		if not save_inits:
+			shutil.rmtree(os.path.join(cache_dir, 'inits_models'))
+
+		#Saving moel params
+		with open(os.path.join(cache_dir, 'model_topology.json'), 'w') as json_file:
+			json_file.write(self._model.to_json(indent=4))
+
+		self._save_history(best_dir, best_callback)
+
+		end_time = time.time()
+		inits_log = dict(best_init=best_init, best_epoch=best_epoch, elapsed_time=round((end_time-start_time), 2), inits_time=inits_time) 
+
+		with open(os.path.join(best_dir, f'inits_log.txt'), 'w') as json_file:
+			json.dump(inits_log, json_file, indent=4)
+
+		return dict(best_callback=best_callback, inits_log=inits_log) 
 
 	@staticmethod
-	def _save_log(folderpath, model, history):
-		"""Saves multiple parameters of the model state, trainning and topology and itself.
-
-		Parameters:
-
-		folderpath: string
-			String with the path to the folder to be saved the files
-
-		model: keras.Sequential
-			Keras model with parameters and itself to be saved
-
-		history: keras.callbacks.History
-			Callback to have its parameters saved
-		"""
-		if not os.path.exists(folderpath):
-			os.makedirs(folderpath)
-		model.save(os.path.join(folderpath, 'model'))
-		model.save_weights(os.path.join(folderpath, 'weights', 'weights'))
-		params_file = open(os.path.join(folderpath, 'model_params.txt'), 'w')
-		params_file.write(f'History.params:\n{history.params}\n')
-		for index, layer in zip(range(len(model.layers)), model.layers):
-			params_file.write(f'Layer {index} params:\n{layer.get_config()}\n')
-		params_file.close()
-		joblib.dump(history.params, os.path.join(folderpath, 'callbacks_History_params.joblib'))
-		best_frame = frame_from_history(history.history)
-		best_frame.to_csv(os.path.join(folderpath, 'training_log.csv'))
+	def _save_history(folderpath, callback):
+		"""Saves the dicts from keras.calbacks.History as json files"""
+		with open(os.path.join(folderpath, 'fitting_params.json'), 'w') as json_file:
+			json.dump(cast_dict_to_python(callback.params), json_file, indent=4)
+		with open(os.path.join(folderpath, 'fitting_metrics.json'), 'w') as json_file:
+			json.dump(cast_dict_to_python(callback.history), json_file, indent=4)
 
 	@classmethod
 	def load(cls, filepath, custom_objects=None, compile=True):
