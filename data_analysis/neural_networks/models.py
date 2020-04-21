@@ -139,6 +139,11 @@ class MultiInitSequential():
 			Name of the metric mesured during the fitting of the model that will be used to select
 			the best method
 
+		mode: str
+			Accepts two values: max and min
+			If min is passed, the init_metric will be minimized
+			If max is passed, the init_metric will be maxmized
+
 		inits_functions: list
 			List of functions to be applied to every initialization of the model.
 			The functions must accept two arguments, one instance of this class and a filepath
@@ -148,13 +153,15 @@ class MultiInitSequential():
 			If true saves all the models initialized inside a folder called inits_model and allows
 			inits_functions to be applied
 
+		cache_dir: str
+			Path to save the models, parameters and temporary data
+
 		Returns:
 		
-		best_log: keras.callbacks.callbacks.History
-			History callback from the best model
-		
-		best_init: int
-			Number of the best initialization statring from zero
+		log_dict: dict
+			Dict with the given values:
+			history_callback: keras.callback.History of the best init
+			inits_log: dict with informations from the initializations
 		"""
 
 		start_time = time.time()
@@ -275,7 +282,7 @@ class MultiInitSequential():
 		end_time = time.time()
 		inits_log = dict(best_init=best_init, best_epoch=best_epoch, elapsed_time=round((end_time-start_time), 2), inits_time=inits_time) 
 
-		with open(os.path.join(best_dir, f'inits_log.txt'), 'w') as json_file:
+		with open(os.path.join(cache_dir, f'inits_log.json'), 'w') as json_file:
 			json.dump(inits_log, json_file, indent=4)
 
 		return dict(best_callback=best_callback, inits_log=inits_log) 
