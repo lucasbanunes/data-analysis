@@ -144,3 +144,36 @@ def reshape_conv_input(data):
     shape.append(1)
     data.reshape(tuple(shape))
     return data.reshape(tuple(shape))
+
+def cast_to_python(var):
+    """Casts a variable with other packages types to its respective python type if possible and returns it"""
+    typo = type(var)
+    if (typo == np.float32) or (typo == np.float64) or (typo == np.float16):
+        return float(var)
+    elif (typo == np.int16) or (typo == np.int32) or (typo == np.int64):
+        return int(var)
+    elif typo == str:
+        return var
+    elif typo == int:
+        return var
+    elif typo == float:
+        return var
+    elif typo == bool:
+        return var
+    else:
+        raise ValueError(f'{typo} casting is not supported')
+
+def cast_dict_to_python(dictionary):
+    """Casts a dict with key and values with other packages types to its respective python type if possible and returns it."""
+    d = dict()
+    for key, value in dictionary.items():
+        if type(value) == list:
+            d[key] = [cast_to_python(var) for var in value]
+        elif type(value) == dict:
+            d[key] = cast_dict_to_python(value)
+        elif type(value) == tuple:
+            d[key] = (cast_to_python(var) for var in value)
+        else:
+            d[key] = cast_to_python(value)
+
+    return d
