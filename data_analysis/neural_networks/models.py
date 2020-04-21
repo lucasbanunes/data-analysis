@@ -122,7 +122,7 @@ class MultiInitSequential():
 			use_multiprocessing=False, 
 			n_inits=1,
 			init_metric='val_accuracy',
-			mode = 'auto',
+			mode = 'max',
 			inits_functions=None,
 			save_inits=False, 
 			cache_dir=''):
@@ -243,7 +243,7 @@ class MultiInitSequential():
 					function(current_model, inits_dir)
 
 			#Updating the best model    
-			if init == 1 or best_metric < init_best_metric:
+			if init == 1 or self._optimized(best_metric, init_best_metric, mode):
 				best_model = init_best_model
 				best_callback = init_callback
 				best_init = init
@@ -287,6 +287,21 @@ class MultiInitSequential():
 			json.dump(cast_dict_to_python(callback.params), json_file, indent=4)
 		with open(os.path.join(folderpath, 'fitting_metrics.json'), 'w') as json_file:
 			json.dump(cast_dict_to_python(callback.history), json_file, indent=4)
+
+	@staticmethod
+	def _optimized(best, current, mode):
+		if mode == 'max':
+			if best < current:
+				return True
+			else:
+				return False
+		elif mode == 'min':
+			if best > current:
+				return True
+			else:
+				return False
+		else:
+			raise ValueError(f'Mode {mode} is not supported')
 
 	@classmethod
 	def load(cls, filepath, custom_objects=None, compile=True):
