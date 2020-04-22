@@ -160,6 +160,8 @@ def cast_to_python(var):
         return var
     elif typo == bool:
         return var
+    elif typo == type(None):
+        return None
     else:
         raise ValueError(f'{typo} casting is not supported')
 
