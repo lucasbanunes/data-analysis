@@ -57,11 +57,11 @@ def train_val_split(x_set, y_set, val_percentage=0.0, shuffle=True):
 
 class LofarSplitter():
 
-    def __init__(self, lofar_data, labels, runs_per_classes):
+    def __init__(self, lofar_data, labels, runs_per_classes, classes):
         self.lofar_data = lofar_data
         self.labels = labels
         self.runs_per_classes = runs_per_classes
-        self.classes = np.unique(labels, axis=0)
+        self.classes = classes
         self._compiled = False
         self.nov_cls = None
 
@@ -111,6 +111,9 @@ class LofarSplitter():
             y_set = self.labels
             sequence = LofarSequence
 
+        if shuffle:
+            x_set, y_set = utils.shuffle_pair(x_set, y_set)
+
         if self.nov_cls is None:
             x_known = x_set
             y_known = y_set
@@ -119,8 +122,8 @@ class LofarSplitter():
             y_known = y_set[np.any(y_set != self.nov_cls, axis=-1)]
             x_novelty = x_set[np.all(y_set == self.nov_cls, axis=-1)]
             y_novelty = y_set[np.all(y_set == self.nov_cls, axis=-1)]
-
-        kfolder = KFold(n_splits, shuffle, random_state)
+        
+        kfolder = KFold(n_splits)
 
         for fit_index, test_index in kfolder.split(x_known, y_known):
 
