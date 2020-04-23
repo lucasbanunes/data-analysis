@@ -179,3 +179,11 @@ def cast_dict_to_python(dictionary):
             d[key] = cast_to_python(value)
 
     return d
+
+def to_sparse_tanh(y, num_classes=None):
+    if num_classes is None:
+        num_classes = len(np.unique(y))
+    sparse_tanh = np.full(shape=(len(y), num_classes), fill_value=-1, dtype=np.int32)
+    for class_, event in zip(y,sparse_tanh):
+        event[class_] = 1
+    return sparse_tanh
