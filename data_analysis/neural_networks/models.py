@@ -424,7 +424,7 @@ class ExpertsCommittee():
 					spl_weight = sample_weight['expert']
 
 				experts_logs[class_] = expert.multi_init_fit(x=train_expert, y=None, batch_size=batch_size, epochs=epochs, verbose=verbose, callbacks=callbacks,
-										validation_split=0.0, validation_data=val_expert, shuffle=shuffle, class_weight=None,
+										validation_split=0.0, validation_data=val_expert, shuffle=shuffle, class_weight=cls_weight,
 										sample_weight=spl_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
 										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
 										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits, 
@@ -542,7 +542,7 @@ class ExpertsCommittee():
 		target_value = self.mapping(class_)
 		data_seq = deepcopy(x)
 		if (DataSequence in type(x).__bases__):
-			data_seq.apply(lambda x,y: (x,np.array([1 if np.all(class_value == target_value) else 0 for class_value in y])))
+			data_seq.apply(lambda x,y: (x,np.where(np.all(y == target_value, axis=-1), 1, -1)))
 			return data_seq
 		else:
 			raise ValueError(f'{type(x)} is not supported. Use a child class from data_analysis.utils.utils.DataSequence')
