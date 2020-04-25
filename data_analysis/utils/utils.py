@@ -131,6 +131,24 @@ def shuffle_pair(x, y):
     
     return np.array(x), np.array(y)
 
+def sort_pair(x, y, sort_to='x'):
+    if sort_to == 'x':
+        guide = x
+        guided = y
+    elif sort_to == 'y':
+        guide = y
+        guided = x
+    else:
+        raise ValueError
+    sorted_guide = np.sort(guide)
+    sorted_guided = np.empty(len(guided), dtype=guided.dtype)
+    indexes = np.arange(len(guided), dtype=np.int64)
+    for index in indexes:
+        correct_index = indexes[sorted_guide == guide[index]]
+        sorted_guided[correct_index] = guide[index]
+
+    return guide, guided
+
 def reshape_conv_input(data):
     """Returns an numpy.ndarray reshaped as an input for a convolutional layer from keras
 
