@@ -169,7 +169,7 @@ def cast_dict_to_python(dictionary):
     """Casts a dict with key and values with other packages types to its respective python type if possible and returns it."""
     d = dict()
     for key, value in dictionary.items():
-        if type(value) == list:
+        if type(value) == list or type(value) == np.ndarray:
             d[key] = [cast_to_python(var) for var in value]
         elif type(value) == dict:
             d[key] = cast_dict_to_python(value)
