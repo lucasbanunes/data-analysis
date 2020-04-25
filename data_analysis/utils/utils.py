@@ -187,3 +187,26 @@ def to_sparse_tanh(y, num_classes=None):
     for class_, event in zip(y,sparse_tanh):
         event[class_] = 1
     return sparse_tanh
+
+def around(num):
+    decimals=0
+    i = 1
+    while True:
+        if num>i:
+            return round(num, decimals), decimals
+        else:
+            decimals += 1
+            i = i*0.1
+
+class NumericalIntegration():
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def trapezoid_rule(x, y):
+        area = 0
+        for k in range(1, len(x)):
+            dx = x[k]-x[k-1]
+            area += (y[k]+y[k-1]) * dx / 2
+
+        return area
