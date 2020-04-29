@@ -38,13 +38,14 @@ class DataSequence(Sequence):
             Arrays returned from the function
         """
         if args is None:
-            self.x_set, self.y_set = function(self.x_set, self.y_set)
+            x_set, y_set= function(self.x_set, self.y_set)
         else:
             args['x_set'] = self.x_set
             args['y_set'] = self.y_set
             x_set, y_set = function(**args)
-            self.x_set = self._numpy_array(x_set)
-            self.y_set = self._numpy_array(y_set)
+
+        self.x_set = self._numpy_array(x_set)
+        self.y_set = self._numpy_array(y_set)
         return self.x_set, self.y_set
 
     def gradient_weights(self):
@@ -209,12 +210,12 @@ def to_sparse_tanh(y, num_classes=None):
 def around(num):
     decimals=0
     i = 1
-    while True:
+    while decimals<10:
         if num>i:
             return round(num, decimals), decimals
-        else:
-            decimals += 1
-            i = i*0.1
+        decimals += 1
+        i = i*0.1
+    return 0.0, decimals
 
 class NumericalIntegration():
     def __init__(self):
