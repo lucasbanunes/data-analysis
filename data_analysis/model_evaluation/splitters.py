@@ -57,11 +57,11 @@ def train_val_split(x_set, y_set, val_percentage=0.0, shuffle=True):
 
 class LofarSplitter():
 
-    def __init__(self, lofar_data, labels, runs_per_classes, classes):
+    def __init__(self, lofar_data, labels, runs_per_classes, classes_values):
         self.lofar_data = lofar_data
         self.labels = labels
         self.runs_per_classes = runs_per_classes
-        self.classes = classes
+        self.classes_values = classes_values
         self._compiled = False
         self.nov_cls = None
 
@@ -90,7 +90,7 @@ class LofarSplitter():
         self._compiled = True
         
     def set_novelty(self, nov_cls, to_known_value):
-        if nov_cls in self.classes:
+        if nov_cls in self.classes_values.keys():
             self.nov_cls = nov_cls
         else:
             raise ValueError('The given novelty class is not on the classes parameter.')
@@ -104,7 +104,7 @@ class LofarSplitter():
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
         if self.mount_images:
-            x_set, y_set = window_runs(self.runs_per_classes, self.classes, self.window_size, self.stride)
+            x_set, y_set = window_runs(self.runs_per_classes.values(), self.classes_values.values(), self.window_size, self.stride)
             sequence = LofarImgSequence
         else:
             x_set = self.lofar_data
@@ -118,10 +118,10 @@ class LofarSplitter():
             x_known = x_set
             y_known = y_set
         else:
-            x_known = x_set[np.any(y_set != self.nov_cls, axis=-1)]
-            y_known = y_set[np.any(y_set != self.nov_cls, axis=-1)]
-            x_novelty = x_set[np.all(y_set == self.nov_cls, axis=-1)]
-            y_novelty = y_set[np.all(y_set == self.nov_cls, axis=-1)]
+            x_known = x_set[np.any(y_set != self.classes_values[self.nov_cls], axis=-1)]
+            y_known = y_set[np.any(y_set != self.classes_values[self.nov_cls], axis=-1)]
+            x_novelty = x_set[np.all(y_set == self.classes_values[self.nov_cls], axis=-1)]
+            y_novelty = y_set[np.all(y_set == self.classes_values[self.nov_cls], axis=-1)]
         
         kfolder = KFold(n_splits)
 
