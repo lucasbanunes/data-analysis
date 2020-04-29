@@ -248,38 +248,36 @@ class LofarSplitter():
                 yield class_out, run_out, x_test_seq, y_test, val_set, train_set
 
     @staticmethod
-    def leave1run_out(runs_per_classes, classes):
+    def leave1run_out(runs_per_classes):
         """Generator that returns the range of the run left out for test and the rest for fitting
         
         Parameters:
 
-        runs_per_classes: 2D array-like
-            Array with first dimension being the number of classes and second being the runs from that class.
-
-        classes: 1D array-like
-            Respective class for each run fom runs_per class
+        runs_per_classes: OrderedDict or dict(Python 3.7+)
+            Dictionary with the keys as the classes_names and its respective value as an array with
+            the ranges of its runs.
 
         Yields:
 
-        class_out:
-            Class taken out
+        class_out_name:
+            Name of the class that was taken out
         
         run_out: int
-            Index of the run taken out
+            Index of the run that was taken out
 
         test_run:
             Test run
 
         train_runs_per_class:
-            Classes for training with the same format from runs_per_class
+            Classes and runs for training with the same format of runs_per_class
         """
     
-        for class_index, class_out in zip(range(len(runs_per_classes)), classes):
-            for run_out in range(len(runs_per_classes[class_index])):
+        for class_out_name, runs in runs_per_classes.items():
+            for run_out_index in range(len(runs)):
                 train_runs_per_class = deepcopy(runs_per_classes)
-                test_run = train_runs_per_class[class_index].pop(run_out)
+                test_run = train_runs_per_class[class_out_name].pop(run_out_index)
 
-                yield class_out, run_out, test_run, train_runs_per_class
+                yield class_out_name, run_out_index, test_run, train_runs_per_class
 
     def __print__(self):
         parameters = self.__dict__
