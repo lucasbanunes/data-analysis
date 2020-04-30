@@ -542,7 +542,7 @@ class ExpertsCommittee():
 		target_value = self.mapping(class_)
 		data_seq = deepcopy(x)
 		if (DataSequence in type(x).__bases__):
-			data_seq.apply(lambda x,y: (x,np.where(np.all(y == target_value, axis=-1), 1, -1)))
+			data_seq.apply(lambda x,y: (x,np.array([1 if np.all(value == target_value) else 0 for value in y])))
 			return data_seq
 		else:
 			raise ValueError(f'{type(x)} is not supported. Use a child class from data_analysis.utils.utils.DataSequence')
