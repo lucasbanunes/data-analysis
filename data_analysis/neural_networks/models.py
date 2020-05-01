@@ -447,7 +447,7 @@ class ExpertsCommittee():
 				if class_weight is None:
 					cls_weight = None
 				elif (class_weight == 'gradient_weights') or (class_weight['wrapper'] == 'gradient_weights'):
-					cls_weight = train_expert.gradient_weights()						
+					cls_weight = train_set.gradient_weights()						
 				else:
 					cls_weight = class_weight['wrapper']
 
@@ -518,7 +518,7 @@ class ExpertsCommittee():
 			predictions = dict()
 			for class_, expert in self.experts.items(): 
 				predictions[class_] = expert.predict(x, batch_size=batch_size, verbose=verbose, steps=steps, callbacks=callbacks, 
-													max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing)
+													max_queue_size=max_queue_size, workers=workers, use_multiprocessing=use_multiprocessing).flatten()
 		return predictions
 
 	def _check_integrity(self):
