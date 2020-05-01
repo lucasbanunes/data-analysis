@@ -126,23 +126,28 @@ def get_novelty_eff(results_frame,
     precision = np.apply_along_axis(lambda x: precision_score(y_true, x, labels = [0,1], average=None, sample_weight=sample_weight), 0, novelty_matrix)
     nov_eff_frame = pd.DataFrame(np.vstack((recall, precision)), columns = ['Recall', 'Precision'], index=pd.MuliIndex.from_product([['Known', 'Nov'], threshold], names=('Class', 'Threshold')))
     if not filepath is None:
-        folder, filename = os.path.split(filepath)
+        folder, _ = os.path.split(filepath)
         if not os.path.exists(folder):
             os.makedirs(folder)
         nov_eff_frame.to_csv(filepath, index = False)
     return nov_eff_frame    
 
-def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), filepath=None):
+def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), area=True, filepath=None):
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
-    recall = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
+    trigger, novelty_rate = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
     fig, axis = plt.subplots(figsize=(12,3))
     axis.set_title(f'NOC Curve Novelty class {nov_class_name}')
     axis.set_ylabel('Trigger Rate')
     axis.set_ylim(0,1)
     axis.set_xlim(0,1)
     axis.set_xlabel('Novelty Rate')
-    axis.plot(recall[1], recall[0])
+    axis.plot(novelty_rate, trigger)
+    if area:
+        noc_area = NumericalIntegration.trapezoid_rule(novelty_rate, trigger)
+        axis.fill_between(novelty_rate, trigger, interpolate=True, color='#808080')
+        plt.text(0.3, 0.25, f'Area = {noc_area}',
+                    horizontalalignment='center', fontsize=20)
     plt.tight_layout()
     if not filepath is None:
         fig.savefig(fname=filepath, dpi=200, format='png')
@@ -158,7 +163,6 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
     axis.set_title(f'Novelty class {nov_class_name}')
     axis.set_ylabel('Accuracy')
     axis.set_ylim(0,1)
-    axis.set_xlim(0,1)
     axis.set_xlabel('Threshold')
     axis.plot(threshold, acc)
     plt.tight_layout()
