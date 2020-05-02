@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import recall_score, accuracy_score, precision_score
+from data_analysis.utils.utils import NumericalIntegration
 
 def create_threshold(quantity, 
                      interval):
@@ -89,7 +90,7 @@ def get_results(predictions,
         inner_level.append('L')
         novelty_frame = pd.DataFrame(np.concatenate((predictions, novelty_matrix, labels_matrix), axis = 1), columns = pd.MultiIndex.from_arrays([outer_level, inner_level]))
         if not filepath is None:
-            folder, filename = os.path.split(filepath)
+            folder, _ = os.path.split(filepath)
             if not os.path.exists(folder):
                 os.makedirs(folder)
             novelty_frame.to_csv(filepath, index = False)
@@ -126,23 +127,28 @@ def get_novelty_eff(results_frame,
     precision = np.apply_along_axis(lambda x: precision_score(y_true, x, labels = [0,1], average=None, sample_weight=sample_weight), 0, novelty_matrix)
     nov_eff_frame = pd.DataFrame(np.vstack((recall, precision)), columns = ['Recall', 'Precision'], index=pd.MuliIndex.from_product([['Known', 'Nov'], threshold], names=('Class', 'Threshold')))
     if not filepath is None:
-        folder, filename = os.path.split(filepath)
+        folder, _ = os.path.split(filepath)
         if not os.path.exists(folder):
             os.makedirs(folder)
         nov_eff_frame.to_csv(filepath, index = False)
     return nov_eff_frame    
 
-def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), filepath=None):
+def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), area=True, filepath=None):
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
-    recall = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
+    trigger, novelty_rate = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
     fig, axis = plt.subplots(figsize=(12,3))
     axis.set_title(f'NOC Curve Novelty class {nov_class_name}')
     axis.set_ylabel('Trigger Rate')
     axis.set_ylim(0,1)
     axis.set_xlim(0,1)
     axis.set_xlabel('Novelty Rate')
-    axis.plot(recall[1], recall[0])
+    axis.plot(novelty_rate, trigger)
+    if area:
+        noc_area = NumericalIntegration.trapezoid_rule(novelty_rate, trigger)
+        axis.fill_between(novelty_rate, trigger, interpolate=True, color='#808080')
+        plt.text(0.3, 0.25, f'Area = {noc_area}',
+                    horizontalalignment='center', fontsize=20)
     plt.tight_layout()
     if not filepath is None:
         fig.savefig(fname=filepath, dpi=200, format='png')
@@ -158,7 +164,6 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
     axis.set_title(f'Novelty class {nov_class_name}')
     axis.set_ylabel('Accuracy')
     axis.set_ylim(0,1)
-    axis.set_xlim(0,1)
     axis.set_xlabel('Threshold')
     axis.plot(threshold, acc)
     plt.tight_layout()
@@ -166,7 +171,20 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
         fig.savefig(fname=filepath, dpi=200, format='png')
     plt.close(fig)
     return fig
-                    
+
+def get_recall_score(results_frame):
+    y_true, novelty_matrix = _get_as_binary(results_frame)
+    return np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
+
+def get_accuracy_score(results_frame):
+    y_true, novelty_matrix = _get_as_binary(results_frame)
+    return np.apply_along_axis(lambda x: accuracy_score(y_true, x), 0, novelty_matrix)
+
+def _get_as_binary(results_frame):
+    y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
+    novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
+    return y_true, novelty_matrix
+
 def _get_novelty_matrix(predictions, threshold, neuron_names):
         """
         Returns a novelty detection matrix with the classification in the cases where novelty was
