@@ -205,7 +205,7 @@ class LofarSplitter():
                 del x_known_test, y_known_test, x_novelty, y_novelty
             
             if self.mount_images:
-                x_fit, y_fit = window_runs(train_runs_per_class.values(), train_classes_values_map.items(), self.window_size, self.stride)
+                x_fit, y_fit = window_runs(train_runs_per_class.values(), train_classes_values_map.values(), self.window_size, self.stride)
                 sequence = LofarImgSequence
             else:
                 fit_index = np.hstack(np.hstack(train_runs_per_class.values()))
@@ -215,6 +215,7 @@ class LofarSplitter():
                 del fit_index
 
             if not self.nov_cls is None:    #Need to compensate the training and val data for missing class
+                print(y_fit)
                 y_fit = np.apply_along_axis(self.to_known_value, axis=-1, arr=y_fit)
 
             x_test_seq = sequence(lofar_data=self.lofar_data, x_set=x_test, y_set=y_test, batch_size=self.test_batch, 
