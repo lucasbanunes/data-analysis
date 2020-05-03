@@ -52,6 +52,10 @@ class DataSequence(Sequence):
         """Applies gradient_weights function"""
         return gradient_weights(self.y_set)
 
+    def input_shape(self):
+        input_shape = self[0].shape[1:]
+        return input_shape
+
     @staticmethod
     def _numpy_array(array):
         """Tests if the array is a numpy array and returns a numpy array version if not"""
