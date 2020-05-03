@@ -237,7 +237,7 @@ class MultiInitSequential():
 											workers=workers, 
 											use_multiprocessing=use_multiprocessing)
 
-			init_best_epoch = int(os.listdir(ck_dir)[-1].split('_')[-1])
+			init_best_epoch = int(np.sort(os.listdir(ck_dir))[-1].split('_')[-1])
 			init_best_metric = init_callback.history[init_metric][init_best_epoch-1]
 			init_best_model = os.path.join(ck_dir, os.listdir(ck_dir)[-1])
 
