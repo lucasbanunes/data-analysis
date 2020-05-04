@@ -451,7 +451,7 @@ class ExpertsCommittee():
 				self.experts[class_] = os.path.join(cache_dir, 'best_model', 'model')
 
 			if self.wrapper is None:
-				log = dict(wrapper_log=None, experts_logs=experts_logs)
+				logs = dict(wrapper_log=None, experts_logs=experts_logs)
 				return logs
 			else:
 
@@ -500,7 +500,6 @@ class ExpertsCommittee():
 		"""Checks if compile_params exists if not raises an error"""
 		if self.compile_params is None:
 			raise RuntimeError('The model must be compiled before training.')
-		return wrapper_train, wrapper_val
 
 	def _exp_formatting(self, classes, experts):
 		"""It checks if the passed experts are correctly typed and returns
@@ -521,3 +520,18 @@ class ExpertsCommittee():
 			else:
 				raise ValueError(f'The expert must be a path to the model folder or the model itself')
 		return new_experts
+
+	def _wrap_formatting(self, wrapper):
+		"""It checks if the passed wrapper is correctly formated
+		and returns the correct format if not."""
+		if type(wrapper) == str:
+			return wrapper
+		elif type(wrapper) == keras.Model:
+			save_dir = os.path.join(self.cache_dir, 'blank_models', 'wrapper')
+			wrapper.save(save_dir)
+			del wrapper
+			gc.collect()
+			keras.backend.clear_session()
+			return save_dir
+		else:
+			raise ValueError('The wrapper must be a path to the model directory or the model itself')
