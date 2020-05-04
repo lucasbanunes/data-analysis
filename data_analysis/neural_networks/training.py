@@ -17,44 +17,44 @@ import tensorflow.keras.backend as K
 from data_analysis.utils import utils, metrics
 
 def multi_init_fit(self, model, x, 
-			y=None, 
-			batch_size=None, 
-			epochs=1, 
-			verbose=1, 
-			callbacks=None, 
-			validation_split=0.0, 
-			validation_data=None, 
-			shuffle=True, 
-			class_weight=None, 
-			sample_weight=None, 
-			initial_epoch=0, 
-			steps_per_epoch=None, 
-			validation_steps=None, 
-			validation_freq=1, 
-			max_queue_size=10, 
-			workers=1, 
-			use_multiprocessing=False, 
-			n_inits=1,
-			init_metric='val_accuracy',
-			mode = 'max',
-			inits_functions=None,
-			save_inits=False, 
-			cache_dir=''):
-    """Alias for the fit method from keras' models with multiple initializations.
+					y=None, 
+					batch_size=None, 
+					epochs=1, 
+					verbose=1, 
+					callbacks=None, 
+					validation_split=0.0, 
+					validation_data=None, 
+					shuffle=True, 
+					class_weight=None, 
+					sample_weight=None, 
+					initial_epoch=0, 
+					steps_per_epoch=None, 
+					validation_steps=None, 
+					validation_freq=1, 
+					max_queue_size=10, 
+					workers=1, 
+					use_multiprocessing=False, 
+					n_inits=1,
+					init_metric='val_accuracy',
+					mode = 'max',
+					inits_functions=None,
+					save_inits=False, 
+					cache_dir=''):
+	"""Alias for the fit method from keras' models with multiple initializations.
 	All parameters except the ones below  and the callbacks parameter function 
 	exactly like the ones from the cited method and are applied to every initialization.
 
 	With this fit, a keras.callbacks.ModelCheckpoint instance will always be appended to the list of callbacks
 	or added if there are none as a way to save and to keep track of the best initialization to be returned
-		
+
 	Parameters:
 
 	model: keras.Model or keras.Sequential
 		Model to be trained
-	
+
 	n_inits: int
 		Number of initializations of the model
-	
+
 	init_metric: str
 		Name of the metric mesured during the fitting of the model that will be used to select
 		the best method
@@ -77,12 +77,11 @@ def multi_init_fit(self, model, x,
 		Path to save the models, parameters and temporary data
 
 	Returns:
-	
+
 	log_dict: dict
 		Dict with the given values:
-		history_callback: keras.callback.History of the best init
-		inits_log: dict with informations from the initializations
-	"""
+	history_callback: keras.callback.History of the best init
+		inits_log: dict with informations from the initializations"""
 
 	start_time = time.time()
 	inits_time = list()
@@ -117,23 +116,23 @@ def multi_init_fit(self, model, x,
 			print(f'Starting initialization {init}')
 
 		init_callback = model.fit(x=x, 
-							y=y, 
-							batch_size=batch_size, 
-							epochs=epochs, 
-							verbose=verbose, 
-							callbacks=init_callbacks, 
-							validation_split=validation_split, 
-							validation_data=validation_data, 
-							shuffle=shuffle, 
-							class_weight=class_weight, 
-							sample_weight=sample_weight, 
-							initial_epoch=initial_epoch, 
-							steps_per_epoch=steps_per_epoch, 
-							validation_steps=validation_steps, 
-							validation_freq=validation_freq, 
-							max_queue_size=max_queue_size, 
-							workers=workers, 
-							use_multiprocessing=use_multiprocessing)
+									y=y, 
+									batch_size=batch_size, 
+									epochs=epochs, 
+									verbose=verbose, 
+									callbacks=init_callbacks, 
+									validation_split=validation_split, 
+									validation_data=validation_data, 
+									shuffle=shuffle, 
+									class_weight=class_weight, 
+									sample_weight=sample_weight, 
+									initial_epoch=initial_epoch, 
+									steps_per_epoch=steps_per_epoch, 
+									validation_steps=validation_steps, 
+									validation_freq=validation_freq, 
+									max_queue_size=max_queue_size, 
+									workers=workers, 
+									use_multiprocessing=use_multiprocessing)
 
 		init_best_epoch = int(np.sort(os.listdir(ck_dir))[-1].split('_')[-1])
 		init_best_metric = init_callback.history[init_metric][init_best_epoch-1]
@@ -144,7 +143,7 @@ def multi_init_fit(self, model, x,
 				json.dump(utils.cast_dict_to_python(init_callback.params), json_file, indent=4)
 			with open(os.path.join(init_dir, 'fitting_metrics.json'), 'w') as json_file:
 				json.dump(utils.cast_dict_to_python(init_callback.history), json_file, indent=4)
-		
+
 		#Executing the functions
 		if not inits_functions is None:
 			for function in inits_functions:
@@ -188,7 +187,7 @@ def multi_init_fit(self, model, x,
 
 	gc.collect()
 	K.clear_session()
-	
+
 	log = dict(best_callback=best_callback, inits_log=inits_log)
 
 	return model, log
@@ -199,7 +198,7 @@ def reinitialize_weights(model):
 	Parameters: 
 
 	model: keras.Model or keras.Sequential
-		Model to have its weights reinitialized
+	Model to have its weights reinitialized
 	"""
 	for layer in model.layers:
 		layer_config = layer.get_config()
