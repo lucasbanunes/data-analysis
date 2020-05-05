@@ -16,7 +16,7 @@ from tensorflow.keras.models import load_model
 import tensorflow.keras.backend as K
 from data_analysis.utils import utils, metrics
 
-def multi_init_fit(self, model, x, 
+def multi_init_fit(model, x, 
 					y=None, 
 					batch_size=None, 
 					epochs=1, 
@@ -136,7 +136,7 @@ def multi_init_fit(self, model, x,
 
 		init_best_epoch = int(np.sort(os.listdir(ck_dir))[-1].split('_')[-1])
 		init_best_metric = init_callback.history[init_metric][init_best_epoch-1]
-		init_best_model = os.path.join(ck_dir, os.path.join(ck_dir, f'epoch_{init_best_epoch}'))
+		init_best_model = os.path.join(ck_dir, f'epoch_{init_best_epoch}')
 
 		if save_inits:
 			with open(os.path.join(init_dir, 'fitting_params.json'), 'w') as json_file:
@@ -192,8 +192,8 @@ def multi_init_fit(self, model, x,
 
 	return model, log
 
-def reinitialize_weights(model):
-	"""Reinitialize the weights from the model
+def reinitialize_weights(model, verbose=True):
+	"""Reinitialize thw trainable weights from the model
 
 	Parameters: 
 
@@ -201,13 +201,22 @@ def reinitialize_weights(model):
 	Model to have its weights reinitialized
 	"""
 	for layer in model.layers:
-		layer_config = layer.get_config()
-		shapes = [weight.shape for weight in layer.get_weights()]
-		param = list()
-		for i in range(len(shapes)):
-			if i==0:	#Actual weights
-				initializer = getattr(keras.initializers, layer_config['kernel_initializer']['class_name']).from_config(layer_config['kernel_initializer']['config'])
-			elif i==1:	#Bias
-				initializer = getattr(keras.initializers, layer_config['bias_initializer']['class_name']).from_config(layer_config['bias_initializer']['config'])
-			param.append(np.array(initializer.__call__(shape=shapes[i])))
-		layer.set_weights(param)
+		try:
+			layer.layers
+			reinitialize_weights(layer)
+		except AttributeError:
+			if layer.trainable == True:
+				if verbose:
+					print(f'Reinitializing layer {layer.name}')
+					print(f'Type: {type(layer)}')
+					print(f'Bases: {type(layer).__bases__}')
+				layer_config = layer.get_config()
+				shapes = [weight.shape for weight in layer.get_weights()]
+				param = list()
+				for i in range(len(shapes)):
+					if i==0:	#Actual weights
+						initializer = getattr(keras.initializers, layer_config['kernel_initializer']['class_name']).from_config(layer_config['kernel_initializer']['config'])
+					elif i==1:	#Bias
+						initializer = getattr(keras.initializers, layer_config['bias_initializer']['class_name']).from_config(layer_config['bias_initializer']['config'])
+					param.append(np.array(initializer.__call__(shape=shapes[i])))
+				layer.set_weights(param)
