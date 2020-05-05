@@ -53,7 +53,7 @@ class DataSequence(Sequence):
         return gradient_weights(self.y_set)
 
     def input_shape(self):
-        input_shape = self[0].shape[1:]
+        input_shape = self[0][0].shape[1:]
         return input_shape
 
     @staticmethod
