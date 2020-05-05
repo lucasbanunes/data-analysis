@@ -241,7 +241,7 @@ class MultiInitSequential():
 
 			init_best_epoch = int(os.listdir(ck_dir)[-1].split('_')[-1])
 			init_best_metric = init_callback.history[init_metric][init_best_epoch-1]
-			init_best_model = os.path.join(ck_dir, os.listdir(ck_dir)[-1])
+			init_best_model = os.path.join(ck_dir, f'epoch_{init_best_epoch}')
 
 			if save_inits:
 				self._save_history(inits_dir, init_callback)
