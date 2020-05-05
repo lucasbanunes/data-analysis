@@ -387,27 +387,38 @@ class ExpertsCommittee():
 			n_inits=1, init_metric='val_accuracy', inits_functions=None, save_inits=False, 
 			cache_dir='', **kwargs):
 
-			"""Trains the committee with the given parameters following the same rules
-			of MultiInitSequential.multi_init_fit with exception of the class_weight and sample_weight parameters handling.
+			"""Trains the experts independently then wrapps the committe output with the given
+			neural network wrapper then returns the entire committee trained as a keras.Model.
+			All the models are trained with multiple initializations
 
 			Parameters:
 
-			class_weight: dict
-				Dict with the keys being 'expert' and 'wrapper' with the desired class_weight for each key.
-				Those parameters will be applied to the experts and the wrapper respectively.
-				The string 'gradient_weights' can be passed as a value. This will make the class_weight be 
-				evaluated by data_analysis.utils.utils.gradient_weights.
-				Defaults to None.
+			x: dict
+				Dict with the training sets (instance of data_analysis.utils.DataSequence).
+				This dict must have a key for each class name passed to the instance and its respective
+				training set for the expert of that class.
+				Also, it must have a key 'committee' with the training data for the entire committe
+				for training the wrapper if it exists.
 
-			sample_weight: dict
-				Dict with the keys being 'expert' and 'wrapper' with the desired sample_weight for each key.
-				Those parameters will be applied to the experts and the wrapper respectively.
-				Defaults to None.
+			epochs: int
+				Number of epochs for the training
+
+			verbose: int
+				Higher the int more output of the method is given
+
+			callbacks: list of keras' callbacks
+				Callbacks to be applied to the training.
+				Since the models are trained with multiple intializations, a keras.callbacks.ModelCheckpoint
+				is always applied even if None is passed.
 			
-			Returns:
+			validation_data: dict
+				Dict with the validation sets (instance of data_analysis.utils.DataSequence).
+				This dict must have a key for each class name passed to the instance and its respective
+				validation set for the expert of that class.
+				Also, it must have a key 'committee' with the validation data for the entire committe
+				for validation the wrapper if it exists.
 
-			log: dict
-				Returns a log with the logs of each model returned from multi_init_fit
+			cl
 			"""
 
 			self._is_compiled()
@@ -441,7 +452,7 @@ class ExpertsCommittee():
 				else:
 					spl_weight = sample_weight['expert']
 
-				experts_logs[class_] = training.multi_init_fit(expert, x=train_expert, epochs=epochs, verbose=verbose, callbacks=callbacks,
+				experts_logs[class_] = training.multi_init_fit(model=expert, x=train_expert, epochs=epochs, verbose=verbose, callbacks=callbacks,
 										validation_data=val_expert, shuffle=shuffle, class_weight=cls_weight,
 										sample_weight=spl_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
 										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
@@ -451,15 +462,18 @@ class ExpertsCommittee():
 				self.experts[class_] = os.path.join(cache_dir, 'best_model', 'model')
 
 			if self.wrapper is None:
-				logs = dict(wrapper_log=None, experts_logs=experts_logs)
-				return logs
+				log = dict(wrapper_log=None, experts_logs=experts_logs)
+				return log
 			else:
 
 				if verbose:
 					print('Training wrapper')
 
+				train_set = x['committee']
+				val_set = validation_data['committee']
+
 				#Loading the models and connecting them to mount the committee
-				committee_input = keras.Input(shape=x.input_shape(), name='committee_input')
+				committee_input = keras.Input(shape=train_set.input_shape(), name='committee_input')
 				experts = [load_model(expert_path, compile=False)(committee_input) for expert_path in self.experts.values()]
 				concat = keras.layers.concatenate(experts)
 				wrapper = load_model(self.wrapper, compile=False)(concat)
@@ -473,7 +487,6 @@ class ExpertsCommittee():
 				committee.compile(**self.compile_params['committee'])
 
 				cache_dir = os.path.join(cache_dir, 'committee')
-				log = dict(experts=experts_logs)
 
 				if class_weight is None:
 					cls_weight = None
@@ -487,11 +500,13 @@ class ExpertsCommittee():
 				else:
 					spl_weight = sample_weight['committee']
 
-				log['committee'] = training.multi_init_fit(committee, x=x, y=None, batch_size=None, epochs=epochs, verbose=verbose, callbacks=callbacks,
-										validation_split=0.0, validation_data=validation_data, shuffle=shuffle, class_weight=cls_weight,
+				log = dict(experts=experts_logs)
+
+				log['committee'] = training.multi_init_fit(model=committee, x=train_set, y=None, batch_size=None, epochs=epochs, verbose=verbose, callbacks=callbacks,
+										validation_split=0.0, validation_data=val_set, shuffle=shuffle, class_weight=cls_weight,
 										sample_weight=spl_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
 										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
-										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits, 
+										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits,
 										cache_dir=cache_dir, **kwargs)
 
 				return committee, log
