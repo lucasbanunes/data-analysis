@@ -134,6 +134,31 @@ def get_novelty_eff(results_frame,
     return nov_eff_frame    
 
 def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), area=True, filepath=None):
+    """Plot noc curve fro given results_frame
+
+    Parameters:
+
+    results_frame: pandas.DataFrame
+        DataFrame returned from get_results function
+
+    nov_class_name: str
+        Name of the novelty class
+
+    figsize: tuple
+        Tuple with the size of the matplotlib.Figure
+
+    area: bool
+        If true calculates  and marks the auc showing its value
+
+    filepath: str
+        Path to save the plot
+
+    Returns:
+        
+    fig: matplotlib.Figure
+        Figure with the plot
+    """
+
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
     trigger, novelty_rate = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
@@ -158,6 +183,28 @@ def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), area=True, fil
     return fig
 
 def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=None):
+    """Plot noc curve fro given results_frame
+
+    Parameters:
+
+    results_frame: pandas.DataFrame
+        DataFrame returned from get_results function
+
+    nov_class_name: str
+        Name of the novelty class
+
+    figsize: tuple
+        Tuple with the size of the matplotlib.Figure
+
+
+    filepath: str
+        Path to save the plot
+
+    Returns:
+        
+    fig: matplotlib.Figure
+        Figure with the plot
+    """
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
     threshold = results_frame.loc[:,'Classification'].columns.values.flatten()
@@ -176,14 +223,17 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
     return fig
 
 def get_recall_score(results_frame):
+    """Computes recall_score for wach threshold for given frame."""
     y_true, novelty_matrix = _get_as_binary(results_frame)
     return np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
 
 def get_accuracy_score(results_frame):
+    """Computes accuracy_score for wach threshold for given frame."""
     y_true, novelty_matrix = _get_as_binary(results_frame)
     return np.apply_along_axis(lambda x: accuracy_score(y_true, x), 0, novelty_matrix)
 
 def _get_as_binary(results_frame):
+    """Gets novelty matrix from the frame as binary, 1 for novelty, 0 for known."""
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
     return y_true, novelty_matrix
