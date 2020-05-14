@@ -48,10 +48,10 @@ def train_val_split(x_set, y_set, val_percentage=0.0, shuffle=True):
         y_set = np.array(y_set)
 
     split = math.ceil(len(x_set)*val_percentage)
-    x_set_train = x_set[:split]
-    x_set_val = x_set[split:]
-    y_set_train = y_set[:split]
-    y_set_val = y_set[split:]
+    x_set_val = x_set[:split]
+    x_set_train = x_set[split:]
+    y_set_val = y_set[:split]
+    y_set_train = y_set[split:]
 
     return x_set_train, y_set_train, x_set_val, y_set_val
 
