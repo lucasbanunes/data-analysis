@@ -193,24 +193,29 @@ def multi_init_fit(model, x,
 	return model, log
 
 def reinitialize_weights(model, verbose=True):
-	"""Reinitialize thw trainable weights from the model
+	"""Reinitialize the trainable weights from the model
 
 	Parameters: 
 
 	model: keras.Model or keras.Sequential
-	Model to have its weights reinitialized
+		Model to have its weights reinitialized
+
+	verbose: bool
+		If True outputs information from the function execution
+
 	"""
+	if verbose:
+		print(f'Reinitializing model {model.name} weights')
 	for layer in model.layers:
-		try:
-			layer.layers
-			reinitialize_weights(layer)
-		except AttributeError:
-			if layer.trainable == True:
+		if layer.trainable:
+			layer_config = layer.get_config()
+			try:
+				#Config dict will have 'layers' as key only if it is a model
+				layer_config['layers']
+				reinitialize_weights(layer, verbose)
+			except KeyError:
 				if verbose:
 					print(f'Reinitializing layer {layer.name}')
-					print(f'Type: {type(layer)}')
-					print(f'Bases: {type(layer).__bases__}')
-				layer_config = layer.get_config()
 				shapes = [weight.shape for weight in layer.get_weights()]
 				param = list()
 				for i in range(len(shapes)):
