@@ -78,9 +78,12 @@ def multi_init_fit(model, x,
 
 	Returns:
 
+	model: keras.Model
+		Uncompiled trained keras.Model
+
 	log_dict: dict
 		Dict with the given values:
-	history_callback: keras.callback.History of the best init
+		history_callback: keras.callback.History of the best init
 		inits_log: dict with informations from the initializations"""
 
 	start_time = time.time()
@@ -96,7 +99,7 @@ def multi_init_fit(model, x,
 
 		init_start = time.time()
 
-		reinitialize_weights(model)
+		reinitialize_weights(model, False)
 
 		#Setting the callbacks
 		init_dir = os.path.join(cache_dir, 'inits_models', f'init_{init}')
@@ -164,9 +167,9 @@ def multi_init_fit(model, x,
 		gc.collect()
 
 	#Defining and saving the best model
-	model = load_model(best_model)
+	model = load_model(best_model, compile=False)
 	best_dir = os.path.join(cache_dir, 'best_model')
-	model.save(os.path.join(best_dir, 'model'))
+	shutil.copytree(best_model, os.path.join(best_dir, 'model'))
 	with open(os.path.join(best_dir, 'fitting_params.json'), 'w') as json_file:
 		json.dump(utils.cast_dict_to_python(init_callback.params), json_file, indent=4)
 	with open(os.path.join(best_dir, 'fitting_metrics.json'), 'w') as json_file:
