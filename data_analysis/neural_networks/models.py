@@ -332,19 +332,12 @@ class ExpertsCommittee():
 		Dict with the classes as keys and each one with the path to the folder
 		where the respective expert model is saved.
 
-	wrapper: str
-		Path to the folder where the classificator that will take the output of all experts
-		and process them to a final output is saved.
-
-	self.mapping: function
-		Function that maps the classes to its respective labels.
+	cache_dir: str
+		Path to where to save the builder's cache
 	"""
-	def __init__(self, mapping, classes, experts, wrapper=None, cache_dir=''):
+	def __init__(self, classes, experts, cache_dir=''):
 		"""
 		Parameters:
-
-		mapping: function
-			Function that maps each class to its respective label to be evaluated by the committee.
 
 		classes: iterable
 			Iterable with the classes as each item
@@ -353,18 +346,12 @@ class ExpertsCommittee():
 			Iterable with each item being a uncompiled keras.Model, or a path to a folder where a
 			keras.Model was saved with keras.Model.save or keras.models.save_model.
 
-		wrapper: str or uncompiled keras.Model
-			Classificator to be used to process the output of the experts.
-			The string must be a path to the folder where a keras.Model was saved.
+		cache_dir: str
+			Path to where to save the builder's cache
 		"""
 
 		self.cache_dir = cache_dir + 'expert_committee'
-		if callable(mapping):
-			self.mapping = mapping
-		else:
-			raise ValueError('The mapping parameter must be callable.')
 		self.experts = self._exp_formatting(classes, experts)
-		self.wrapper = self._wrap_formatting(wrapper)
 		self.compile_params = None
 
 	def compile(self, compile_params):
@@ -373,38 +360,32 @@ class ExpertsCommittee():
 		Parameters:
 
 		compile_params: dict
-		Dictionary that maps the compile params from keras.Model.compile to each model in the committe.
-		The dict must have a committe key that has the compile parameters mapping, and a key for each
-		class that has an expert with a mapping for the compila parameters to be used with the expert of that class.
+		The dict must have each class as a key and its respective value the compile mapping for the expert
+		of that class to be used when fit is called
 		"""
 		self.compile_params = compile_params
 		
 		
-	def fit(self, x=None, epochs=1, verbose=1, callbacks=None,
-			validation_data=None, shuffle=True, class_weight=None,
-			sample_weight=None, initial_epoch=0, steps_per_epoch=None, validation_steps=None, 
-			validation_freq=1, max_queue_size=10, workers=1,use_multiprocessing=False,
-			n_inits=1, init_metric='val_accuracy', inits_functions=None, save_inits=False, 
-			cache_dir='', **kwargs):
+	def fit(self, x=None, epochs=1, verbose=1, callbacks=None, validation_data=None, class_weight=None,
+			validation_freq=1, n_inits=1, init_metric='val_accuracy', mode='max',
+			inits_functions=None, save_inits=False, **kwargs):
 
-			"""Trains the experts independently then wrapps the committe output with the given
-			neural network wrapper then returns the entire committee trained as a keras.Model.
+			"""Trains the experts independently then ensembles them in one keras.Model instance named
+			committee
 			All the models are trained with multiple initializations
+			With the exception of the callbacks parameter the others follow the rules bellow:
+			The parameters not listed bellow are applied to all trainings equally and work exactly as in
+			keras.Model.fit.
+			The ones listed bellow must all be dicts with the keys being the name of the classes of each expert
+			the parameter applied and described bellow is the value of that key.
+			Example:
+			x must be a dict with keys being the name of the classes and the value of each class must be
+			a instante or child class of data_analysis.utils.DataSequence with the training data
 
 			Parameters:
 
-			x: dict
-				Dict with the training sets (instance of data_analysis.utils.DataSequence).
-				This dict must have a key for each class name passed to the instance and its respective
-				training set for the expert of that class.
-				Also, it must have a key 'committee' with the training data for the entire committe
-				for training the wrapper if it exists.
-
-			epochs: int
-				Number of epochs for the training
-
-			verbose: int
-				Higher the int more output of the method is given
+			x: Instante or child class of data_analysis.utils.DataSequence
+				Training data
 
 			callbacks: list of keras' callbacks
 				Callbacks to be applied to the training.
@@ -412,13 +393,19 @@ class ExpertsCommittee():
 				is always applied even if None is passed.
 			
 			validation_data: dict
-				Dict with the validation sets (instance of data_analysis.utils.DataSequence).
-				This dict must have a key for each class name passed to the instance and its respective
-				validation set for the expert of that class.
-				Also, it must have a key 'committee' with the validation data for the entire committe
-				for validation the wrapper if it exists.
+				Validation data
 
-			cl
+			class_weight: dict
+				Class weights to be applied to the loss gradient.
+
+			init_metric: str
+				Name of the metric to be optimized within the initialization
+
+			mode: dict
+				Accepts two values;
+				If max the init_metrics will be maximied
+				If min the init_metric will be minimized
+
 			"""
 
 			self._is_compiled()
@@ -431,85 +418,31 @@ class ExpertsCommittee():
 					
 				gc.collect()
 
-				expert = MultiInitSequential()
 				expert = load_model(expert_path)
 				expert.compile(**self.compile_params[class_])
-
 				cache_dir = os.path.join(self.cache_dir, 'experts', f'{class_}_expert')
 				
-				train_expert = x[class_]
-				val_expert = validation_data[class_]
-
-				if class_weight is None:
-					cls_weight = None
-				elif (class_weight == 'gradient_weights') or (class_weight['expert'] == 'gradient_weights'):
-					cls_weight = train_expert.gradient_weights()
-				else:
-					cls_weight = class_weight['expert']
-
-				if sample_weight is None:
-					spl_weight = None
-				else:
-					spl_weight = sample_weight['expert']
-
-				experts_logs[class_] = training.multi_init_fit(model=expert, x=train_expert, epochs=epochs, verbose=verbose, callbacks=callbacks,
-										validation_data=val_expert, shuffle=shuffle, class_weight=cls_weight,
-										sample_weight=spl_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
-										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
-										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits, 
-										cache_dir=cache_dir, **kwargs)
+				expert, experts_logs[class_] = training.multi_init_fit(model=expert, x=x[class_], epochs=epochs, verbose=verbose, callbacks=callbacks,
+														validation_data=validation_data[class_], class_weight=class_weight[class_],
+														validation_freq=validation_freq, n_inits=n_inits, init_metric=init_metric[class_], 
+														inits_functions=inits_functions, mode=mode[class_],
+														save_inits=save_inits, cache_dir=cache_dir, **kwargs)
 
 				self.experts[class_] = os.path.join(cache_dir, 'best_model', 'model')
 
-			if self.wrapper is None:
-				log = dict(wrapper_log=None, experts_logs=experts_logs)
-				return log
-			else:
+				del expert
+				gc.collect()
+				keras.backend.clear_session()
 
-				if verbose:
-					print('Training wrapper')
-
-				train_set = x['committee']
-				val_set = validation_data['committee']
-
-				#Loading the models and connecting them to mount the committee
-				committee_input = keras.Input(shape=train_set.input_shape(), name='committee_input')
-				experts = [load_model(expert_path, compile=False)(committee_input) for expert_path in self.experts.values()]
-				concat = keras.layers.concatenate(experts)
-				wrapper = load_model(self.wrapper, compile=False)(concat)
-				committee = keras.Model(committee_input, wrapper, name='expert_committee')
-
-				#Freezing the experts
-				for layer in committee.layers[:-1]:		#Leaves the wrapper outside since it is the one to be trained
-					if type(layer) == keras.Model:
-						layer.trainable=False
-
-				committee.compile(**self.compile_params['committee'])
-
-				cache_dir = os.path.join(cache_dir, 'committee')
-
-				if class_weight is None:
-					cls_weight = None
-				elif (class_weight == 'gradient_weights') or (class_weight['committee'] == 'gradient_weights'):
-					cls_weight = x.gradient_weights()						
-				else:
-					cls_weight = class_weight['committee']
-
-				if sample_weight is None:
-					spl_weight = None
-				else:
-					spl_weight = sample_weight['committee']
-
-				log = dict(experts=experts_logs)
-
-				log['committee'] = training.multi_init_fit(model=committee, x=train_set, y=None, batch_size=None, epochs=epochs, verbose=verbose, callbacks=callbacks,
-										validation_split=0.0, validation_data=val_set, shuffle=shuffle, class_weight=cls_weight,
-										sample_weight=spl_weight, initial_epoch=initial_epoch, steps_per_epoch=steps_per_epoch, validation_steps=validation_steps, 
-										validation_freq=validation_freq, max_queue_size=max_queue_size, workers=workers,use_multiprocessing=use_multiprocessing,
-										n_inits=n_inits, init_metric=init_metric, inits_functions=inits_functions, save_inits=save_inits,
-										cache_dir=cache_dir, **kwargs)
-
-				return committee, log
+			committee_input = keras.Input(shape=x['committee'].input_shape(), name='committee_input')
+			experts_list = list()
+			for class_, expert_path in self.experts.items():
+				expert = load_model(expert_path, compile=False)
+				expert.compile(**self.compile_params[class_])
+				experts_list.append(expert)
+			concat = keras.layers.concatenate(experts_list)
+			committee = keras.Model(committee_input, concat, name='experts_committee')
+			return committee, experts_logs
 
 	def _is_compiled(self):
 		"""Checks if compile_params exists if not raises an error"""
@@ -535,18 +468,3 @@ class ExpertsCommittee():
 			else:
 				raise ValueError(f'The expert must be a path to the model folder or the model itself')
 		return new_experts
-
-	def _wrap_formatting(self, wrapper):
-		"""It checks if the passed wrapper is correctly formated
-		and returns the correct format if not."""
-		if type(wrapper) == str:
-			return wrapper
-		elif type(wrapper) == keras.Model:
-			save_dir = os.path.join(self.cache_dir, 'blank_models', 'wrapper')
-			wrapper.save(save_dir)
-			del wrapper
-			gc.collect()
-			keras.backend.clear_session()
-			return save_dir
-		else:
-			raise ValueError('The wrapper must be a path to the model directory or the model itself')
