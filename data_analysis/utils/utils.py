@@ -221,6 +221,37 @@ def around(num):
         i = i*0.1
     return 0.0, decimals
 
+class LoopRange():
+    def __init__(self, start, stop, step=None, initial_value=None, num_samples=None):
+        self.start = start
+        self.stop = stop
+        self.generated = 0
+        if initial_value is None:
+            self.current=start
+        else:
+            self.current=initial_value
+        if step is None:
+            self.step = 1
+        else:
+            self.step = step
+        if num_samples is None:
+            self.num_samples=abs(start-stop)-1
+        else:
+            self.num_samples = num_samples
+
+    def __iter__(self):
+        return self
+    
+    def __next__(self):
+        if self.generated < self.num_samples:
+            if self.current == self.stop:
+                self.current = self.start
+            num = self.current
+            self.current += self.step
+            self.generated += 1
+            return num
+        raise StopIteration
+
 class NumericalIntegration():
     def __init__(self):
         pass
