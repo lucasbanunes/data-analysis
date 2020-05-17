@@ -55,6 +55,52 @@ def train_val_split(x_set, y_set, val_percentage=0.0, shuffle=True):
 
     return x_set_train, y_set_train, x_set_val, y_set_val
 
+
+def most_even_split(index_range, n_splits):
+    """Slices a index array with the given number of splits in the most even manner possible
+    Example:
+    The range(13") object can be seen as
+    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    divided in 5 splits could happen in any number of ways but this method splits it the most 
+    even way possible that is two splits with 2 events and 3 wplits with 3 elements.
+
+    Parameters:
+
+    index_range: 1D array-like
+        A 1D iterable with its elements being ints that simbolizes indexes
+    
+    n_splits: int
+        Number of splits to be done
+
+    Returns:
+
+    splits: list
+        A list with each item being a split array with the indexes of that split
+    """
+    events = len(index_range)
+    index_start = index_range[0]
+    index_end = index_range[-1] + 1
+    events_per_split = int(events/n_splits)
+    remainders = events%n_splits
+    if remainders == 0:     #The array is splitted evenly
+        return [np.arange(split_start, split_start+events_per_split) for split_start in range(index_start, index_end, events_per_split)]
+    else:
+        #Mouting the uneven splits
+        splits = list()
+        start = index_start
+        events_to_add = math_utils.euclidean_algorithm(remainders, n_splits)
+        for _ in range(n_splits):
+            if remainders>0:
+                to_add = events_per_split + events_to_add
+                remainders -= events_to_add
+            elif remainders == 0:
+                to_add = events_per_split
+            else:
+                raise ValueError(f'Reached a negative remainder: {remainders}')
+            splits.append(np.arange(start, start+to_add))
+            start += to_add
+        return splits
+
 class LofarSplitter():
 
     def __init__(self, lofar_data, labels, runs_per_classes, classes_values_map):
