@@ -56,20 +56,33 @@ def window_runs(runs_per_class, classes, window_size, stride):
         respective windows labels
     """
 
-    windows = list()
-    win_labels = list()
+    runs_range = list()
+    runs_win = list()
+    runs_labels = list()
+    run_range_start = 0
     for runs, run_label in zip(runs_per_class, classes):
         for run in runs:
-            run_start = run[0]
-            run_end = run[-1]
-            for win_start in range(run_start, run_end+1, stride):
-                win_end = win_start+window_size
-                if win_end>run_end:     #The window gets out of the run range
-                    break
-                windows.append(range(win_start, win_end))
-                win_labels.append(run_label)
+            windows = window_run(run, window_size, stride)
+            runs_range.append(np.arange(run_range_start, run_range_start+len(windows)))
+            runs_win.append(windows)
+            runs_labels.append(np.full(shape=len(windows), fill_value=run_label))
+            run_range_start += len(windows)
+
+    runs_win = np.array(runs_win)
+    runs_labels = np.array(runs_labels)
+    runs_range = np.array(runs_range)
+
+    return np.concatenate(runs_win, axis=0), np.concatenate(runs_labels, axis=0), np.array(runs_range)
     
-    return np.array(windows), np.array(win_labels)
+def window_run(run, window_size, stride):
+    run_start, run_end = run[0], run[-1]
+    win_start = np.arange(run_start,run_end-window_size, stride)
+    win_end = win_start + window_size
+    #This removes window ends that may be out of range
+    win_start = win_start[win_end <= run_end]
+    win_end = win_end[win_end <= run_end]
+    return np.apply_along_axis(lambda x: np.arange(*x), 1, np.column_stack((win_start, win_end)))
+
 
 class LofarImgSequence(DataSequence):
     """Child class of keras.utils.Sequence that generates lofar images
