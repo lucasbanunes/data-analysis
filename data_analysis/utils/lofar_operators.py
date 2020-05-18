@@ -65,7 +65,7 @@ def window_runs(runs_per_class, classes, window_size, stride):
             windows = window_run(run, window_size, stride)
             runs_range.append(np.arange(run_range_start, run_range_start+len(windows)))
             runs_win.append(windows)
-            runs_labels.append(np.full(shape=len(windows), fill_value=run_label))
+            runs_labels.append(np.array([run_label for _ in range(len(windows))]))
             run_range_start += len(windows)
 
     runs_win = np.array(runs_win)
