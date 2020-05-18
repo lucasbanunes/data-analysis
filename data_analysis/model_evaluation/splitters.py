@@ -6,6 +6,7 @@ import tensorflow as tf
 import tensorflow.keras as keras
 from tensorflow.keras.utils import Sequence, to_categorical
 from sklearn.model_selection import KFold
+from data_analysis.utils import math_utils
 import data_analysis.utils.utils as utils
 from data_analysis.utils.lofar_operators import LofarImgSequence, LofarSequence, window_runs
 
@@ -59,7 +60,7 @@ def train_val_split(x_set, y_set, val_percentage=0.0, shuffle=True):
 def most_even_split(index_range, n_splits):
     """Slices a index array with the given number of splits in the most even manner possible
     Example:
-    The range(13") object can be seen as
+    The range(13) object can be seen as
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     divided in 5 splits could happen in any number of ways but this method splits it the most 
     even way possible that is two splits with 2 events and 3 wplits with 3 elements.
@@ -150,63 +151,60 @@ class LofarSplitter():
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
         if self.mount_images:
-            x_set, y_set = window_runs(self.runs_per_classes.values(), self.classes_values_map.values(), self.window_size, self.stride)
             sequence = LofarImgSequence
+            if self.nov_cls is None:
+                x_known, y_known, known_range = window_runs(self.runs_per_classes.values(), self.classes_values_map.values(), self.window_size, self.stride)
+            else:
+                runs_per_class = deepcopy(self.runs_per_classes)
+                classes_values_map = deepcopy(self.classes_values_map)
+                novelty_runs = runs_per_class.pop(self.nov_cls)
+                novelty_value = classes_values_map.pop(self.nov_cls)
+                x_known, y_known, known_range = window_runs(runs_per_class.values(), classes_values_map.values(), self.window_size, self.stride)
+                x_novelty, y_novelty, novelty_range = window_runs([novelty_runs], [novelty_value], self.window_size, self.stride)
+                del runs_per_class, classes_values_map, novelty_runs, novelty_value
         else:
-            x_set = self.lofar_data
-            y_set = self.labels
-            sequence = LofarSequence
-
-        if shuffle:
-            x_set, y_set = utils.shuffle_pair(x_set, y_set)
-
-        if self.nov_cls is None:
-            x_known = x_set
-            y_known = y_set
-        else:
-            x_known = x_set[np.any(y_set != self.classes_values_map[self.nov_cls], axis=-1)]
-            y_known = y_set[np.any(y_set != self.classes_values_map[self.nov_cls], axis=-1)]
-            x_novelty = x_set[np.all(y_set == self.classes_values_map[self.nov_cls], axis=-1)]
-            y_novelty = y_set[np.all(y_set == self.classes_values_map[self.nov_cls], axis=-1)]
+            sequence = LofarImgSequence
+            if self.nov_cls is None:
+                x_known = self.lofar_data
+                y_known = self.labels
+                known_range = np.concatenate(tuple(self.runs_per_classes.values()))
+            else:
+                x_known = self.lofar_data[np.any(self.labels != self.classes_values_map[self.nov_cls], axis=-1)]
+                y_known = self.labels[np.any(self.labels != self.classes_values_map[self.nov_cls], axis=-1)]
+                x_novelty = self.lofar_data[np.all(self.labels == self.classes_values_map[self.nov_cls], axis=-1)]
+                y_novelty = self.labels[np.all(self.labels == self.classes_values_map[self.nov_cls], axis=-1)]
+                known_range = self._known_runs_range()
         
-        kfolder = KFold(n_splits)
-
-        for fit_index, test_index in kfolder.split(x_known, y_known):
+        for test_index, val_index, train_index in self.run_kfold_split(known_range, n_splits):
 
             #Collecting garbage
             gc.collect()
 
+            x_train = x_known[train_index]
+            y_train = y_known[train_index]
+            x_val = x_known[val_index]
+            y_val = y_known[val_index]
+
             if self.nov_cls is None:
                 x_test = x_known[test_index]
-                y_test = y_known[test_index]
-                x_fit = x_known[fit_index]
-                #No need to compensate
-                y_fit = y_known[fit_index]
+                y_test = y_known[test_index]                
             else:
                 x_test = np.concatenate((x_novelty, x_known[test_index]), axis=0)
                 y_test = np.concatenate((y_novelty, y_known[test_index]), axis=0)
-                x_fit = x_known[fit_index]
                 #Compensating from the class taken out as novelty
-                y_fit = np.apply_along_axis(self.to_known_value, axis=-1, arr=y_known[fit_index])
+                y_train = np.apply_along_axis(self.to_known_value, axis=-1, arr=y_train)
+                y_val = np.apply_along_axis(self.to_known_value, axis=-1, arr=y_val)
             
-            x_test_seq = sequence(lofar_data=self.lofar_data, x_set=x_test, batch_size=self.test_batch, convolutional_input=self.convolutional_input)
+            test_seq = sequence(lofar_data=self.lofar_data, x_set=x_test, y_set=y_test, batch_size=self.test_batch, 
+                                convolutional_input=self.convolutional_input)
 
-            if self.val_percentage is None:
-                #The percentage is treated as 0%
-                train_set = sequence(lofar_data=self.lofar_data, x_set=x_fit, y_set=y_fit, batch_size=self.train_batch, 
-                                     convolutional_input=self.convolutional_input)
-                
-                yield x_test_seq, y_test, train_set
-            else:
-                val_split = math.ceil(len(x_fit)*self.val_percentage)
+            val_seq = sequence(lofar_data=self.lofar_data, x_set=x_val, y_set=y_val, batch_size=self.val_batch, 
+                                convolutional_input=self.convolutional_input)
 
-                train_set = sequence(lofar_data=self.lofar_data, x_set=x_fit[val_split:], y_set=y_fit[val_split:], batch_size=self.train_batch,
-                                     convolutional_input=self.convolutional_input)
-
-                val_set = sequence(lofar_data=self.lofar_data, x_set=x_fit[:val_split], y_set=y_fit[:val_split], batch_size=self.val_batch,
-                                   convolutional_input=self.convolutional_input)
-                
-                yield x_test_seq, y_test, val_set, train_set
+            train_seq = sequence(lofar_data=self.lofar_data, x_set=x_train, y_set=y_train, batch_size=self.train_batch, 
+                                convolutional_input=self.convolutional_input)
+            
+            yield test_seq, y_test, val_seq, train_seq
 
     def leave1run_out_split(self, shuffle=True):
         if not self._compiled:
@@ -230,14 +228,14 @@ class LofarSplitter():
 
             if self.nov_cls is None:
                 if self.mount_images:
-                    x_test, y_test = window_runs([[test_run]], [self.classes_values_map[class_out_name]], self.window_size, self.stride)
+                    x_test, y_test, _ = window_runs([[test_run]], [self.classes_values_map[class_out_name]], self.window_size, self.stride)
                 else:
                     x_test = self.lofar_data[test_run]
                     y_test = self.labels[test_run]
             else:
                 if self.mount_images:
-                    x_known_test, y_known_test = window_runs([[test_run]], [self.classes_values_map[class_out_name]], self.window_size, self.stride)
-                    x_novelty, y_novelty = window_runs([novelty_runs], [self.classes_values_map[self.nov_cls]], self.window_size, self.stride)
+                    x_known_test, y_known_test, _ = window_runs([[test_run]], [self.classes_values_map[class_out_name]], self.window_size, self.stride)
+                    x_novelty, y_novelty, _ = window_runs([novelty_runs], [self.classes_values_map[self.nov_cls]], self.window_size, self.stride)
                 else:       
                     x_known_test = self.lofar_data[test_run]
                     y_known_test = self.labels[test_run]
@@ -251,7 +249,7 @@ class LofarSplitter():
                 del x_known_test, y_known_test, x_novelty, y_novelty
             
             if self.mount_images:
-                x_fit, y_fit = window_runs(train_runs_per_class.values(), train_classes_values_map.values(), self.window_size, self.stride)
+                x_fit, y_fit, _ = window_runs(train_runs_per_class.values(), train_classes_values_map.values(), self.window_size, self.stride)
                 sequence = LofarImgSequence
             else:
                 fit_index = np.hstack(np.hstack(train_runs_per_class.values()))
@@ -290,6 +288,46 @@ class LofarSplitter():
                                    convolutional_input=self.convolutional_input)
                 
                 yield class_out_name, run_out_index, x_test_seq, y_test, val_set, train_set
+
+    def _known_runs_range(self):
+        runs_per_class = deepcopy(self.runs_per_classes)
+        runs_per_class.pop(self.nov_cls)
+        unchanged_ranges = np.concatenate(tuple(runs_per_class.values()))
+        known_range = list()
+        current_range_start = 0
+        for unchanged_range in unchanged_ranges:
+            if unchanged_range[0] == current_range_start:
+                known_range.append(unchanged_range)
+            else:
+                new_range = range(current_range_start, len(unchanged_range))
+                known_range.append(new_range)
+            current_range_start += len(unchanged_range)
+        return known_range
+
+    @staticmethod
+    def run_kfold_split(runs_range, n_splits, shuffle=True):
+
+        runs_splitted = list()
+
+        for run_range in runs_range:
+            splits = most_even_split(run_range,n_splits)
+            if shuffle:
+                np.random.shuffle(splits)
+            runs_splitted.append(splits)
+
+        runs_splitted = np.array(runs_splitted).T
+
+        if shuffle:
+            np.random.shuffle(runs_splitted)
+
+        for test_split, val_split in zip(range(n_splits),utils.LoopRange(0,n_splits, num_samples=n_splits, initial_value=1)):
+            splits_arr = np.arange(n_splits)
+            train_splits = np.all(np.stack((splits_arr != test_split,  splits_arr!= val_split),axis=0), axis=0)
+            test_index = np.hstack(runs_splitted[test_split])
+            val_index = np.hstack(runs_splitted[val_split])
+            train_index = np.hstack(np.hstack(runs_splitted[train_splits]))
+
+            yield test_index, val_index, train_index
 
     @staticmethod
     def leave1run_out(runs_per_classes):
