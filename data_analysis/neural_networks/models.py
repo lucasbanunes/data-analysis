@@ -30,6 +30,10 @@ class MultiInitSequential():
 				sample_weight_mode=None, weighted_metrics=None, target_tensors=None,
 				distribute=None, **kwargs):
 
+		self.compile_params = dict(optimizer=optimizer, loss=loss, metrics=metrics, loss_weights=loss_weights,
+									sample_weight_mode=sample_weight_mode, weighted_metrics=weighted_metrics, target_tensors=target_tensors,
+									distribute=distribute, **kwargs)
+
 		return self._model.compile(optimizer, loss, metrics, loss_weights,
 						   sample_weight_mode, weighted_metrics, target_tensors,
 						   distribute, **kwargs)
@@ -166,128 +170,14 @@ class MultiInitSequential():
 			inits_log: dict with informations from the initializations
 		"""
 
-		start_time = time.time()
-		inits_time = list()
+		self._model, log = training.multi_init_fit(self._model, x, y, batch_size, epochs, verbose, callbacks, validation_split, validation_data,
+													shuffle, class_weight, sample_weight, initial_epoch, steps_per_epoch, validation_steps,
+													validation_freq, max_queue_size, workers, use_multiprocessing, n_inits, init_metric, 
+													mode, inits_functions, save_inits, cache_dir)
+		
+		self._model.compile(**self.compile_params)
 
-		if not os.path.exists(cache_dir):
-			os.makedirs(cache_dir)
-
-		#Saving the current model state to reload it multiple times
-		blank_dir = os.path.join(cache_dir, 'start_model')
-		save_model(model=self._model, filepath=blank_dir)
-
-		#Removing the current model to avoid conflicts with the multiple initializations
-		del self._model
-		gc.collect()
-		keras.backend.clear_session()
-
-		if verbose:
-			print('Starting the multiple initializations')
-
-		for init in range(1, n_inits+1):
-
-			init_start = time.time()
-
-			current_model = load_model(blank_dir)
-
-			#Initialiazing new weights
-			for layer in current_model.layers:
-				layer_config = layer.get_config()
-				shapes = [weight.shape for weight in layer.get_weights()]
-				param = list()
-				for i in range(len(shapes)):
-					if i==0:
-						initializer = getattr(keras.initializers, layer_config['kernel_initializer']['class_name']).from_config(layer_config['kernel_initializer']['config'])
-					elif i==1:
-						initializer = getattr(keras.initializers, layer_config['bias_initializer']['class_name']).from_config(layer_config['bias_initializer']['config'])
-					param.append(np.array(initializer.__call__(shape=shapes[i])))
-				layer.set_weights(param)
-
-			#Setting the callbacks
-			inits_dir = os.path.join(cache_dir, 'inits_models', f'init_{init}')
-			ck_dir = os.path.join(inits_dir, 'models')
-			checkpoint = keras.callbacks.ModelCheckpoint(filepath=os.path.join(ck_dir, 'epoch_{epoch}'), 
-														 save_best_only=True, 
-														 monitor=init_metric, 
-														 verbose=1, mode=mode)
-			if callbacks is None:
-				init_callbacks = [checkpoint]
-			else:
-				init_callbacks = deepcopy(callbacks)
-				init_callbacks.append(checkpoint)
-
-			if verbose:
-				print('---------------------------------------------------------------------------------------------------')
-				print(f'Starting initialization {init}')
-
-			init_callback = current_model.fit(x=x, 
-											y=y, 
-											batch_size=batch_size, 
-											epochs=epochs, 
-											verbose=verbose, 
-											callbacks=init_callbacks, 
-											validation_split=validation_split, 
-											validation_data=validation_data, 
-											shuffle=shuffle, 
-											class_weight=class_weight, 
-											sample_weight=sample_weight, 
-											initial_epoch=initial_epoch, 
-											steps_per_epoch=steps_per_epoch, 
-											validation_steps=validation_steps, 
-											validation_freq=validation_freq, 
-											max_queue_size=max_queue_size, 
-											workers=workers, 
-											use_multiprocessing=use_multiprocessing)
-
-			init_best_epoch = int(np.sort(os.listdir(ck_dir))[-1].split('_')[-1])
-			init_best_metric = init_callback.history[init_metric][init_best_epoch-1]
-			init_best_model = os.path.join(ck_dir, f'epoch_{init_best_epoch}')
-
-			if save_inits:
-				self._save_history(inits_dir, init_callback)
-			
-			#Executing the functions
-			if not inits_functions is None:
-				for function in inits_functions:
-					function(current_model, inits_dir)
-
-			#Updating the best model    
-			if init == 1 or self._optimized(best_metric, init_best_metric, mode):
-				best_model = init_best_model
-				best_callback = init_callback
-				best_init = init
-				best_metric = init_best_metric
-				best_epoch = init_best_epoch
-
-			del current_model
-			gc.collect()    #Collecting remanescent variables
-			keras.backend.clear_session()   #Restarting the graph
-
-			init_end = time.time()
-
-			inits_time.append(round((init_end-init_start), 2))
-
-		#Defining the best model
-		self._model = load_model(best_model)
-		best_dir = os.path.join(cache_dir, 'best_model')
-		self._model.save(os.path.join(best_dir, 'model'))
-
-		if not save_inits:
-			shutil.rmtree(os.path.join(cache_dir, 'inits_models'))
-
-		#Saving moel params
-		with open(os.path.join(cache_dir, 'model_topology.json'), 'w') as json_file:
-			json_file.write(self._model.to_json(indent=4))
-
-		self._save_history(best_dir, best_callback)
-
-		end_time = time.time()
-		inits_log = dict(best_init=best_init, best_epoch=best_epoch, elapsed_time=round((end_time-start_time), 2), inits_time=inits_time) 
-
-		with open(os.path.join(cache_dir, f'inits_log.json'), 'w') as json_file:
-			json.dump(inits_log, json_file, indent=4)
-
-		return dict(best_callback=best_callback, inits_log=inits_log) 
+		return log
 
 	@staticmethod
 	def _save_history(folderpath, callback):
@@ -418,6 +308,8 @@ class ExpertsCommittee():
 					
 				gc.collect()
 
+				data_shape = x[class_].input_shape()
+
 				expert = load_model(expert_path)
 				expert.compile(**self.compile_params[class_])
 				cache_dir = os.path.join(self.cache_dir, 'experts', f'{class_}_expert')
@@ -434,12 +326,12 @@ class ExpertsCommittee():
 				gc.collect()
 				keras.backend.clear_session()
 
-			committee_input = keras.Input(shape=x['committee'].input_shape(), name='committee_input')
+			committee_input = keras.Input(shape=data_shape, name='committee_input')
 			experts_list = list()
 			for class_, expert_path in self.experts.items():
 				expert = load_model(expert_path, compile=False)
 				expert.compile(**self.compile_params[class_])
-				experts_list.append(expert)
+				experts_list.append(expert(committee_input))
 			concat = keras.layers.concatenate(experts_list)
 			committee = keras.Model(committee_input, concat, name='experts_committee')
 			return committee, experts_logs
