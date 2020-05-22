@@ -5,6 +5,14 @@ import tensorflow.keras as keras
 from tensorflow.keras.utils import Sequence, to_categorical
 from data_analysis.utils.utils import reshape_conv_input, shuffle_pair, DataSequence
 
+def normalize(lofar_data, runs, order):
+    normalized_lofar_data = list()
+    for run in runs:
+        lofar_run = lofar_data[run]
+        normalized_lofar_data.append(keras.utils.normalize(lofar_run, order))
+    
+    return np.concatenate(normalized_lofar_data, axis=0)
+
 def lofar2img(lofar_data, windows):
     """Function that takes the windows and the lofar_data and mount the
     images
