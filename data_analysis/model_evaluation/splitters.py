@@ -84,7 +84,7 @@ def most_even_split(index_range, n_splits):
     events_per_split = int(events/n_splits)
     remainders = events%n_splits
     if remainders == 0:     #The array is splitted evenly
-        return [np.arange(split_start, split_start+events_per_split) for split_start in range(index_start, index_end, events_per_split)]
+        splits =  [np.arange(split_start, split_start+events_per_split) for split_start in range(index_start, index_end, events_per_split)]
     else:
         #Mouting the uneven splits
         splits = list()
@@ -100,7 +100,7 @@ def most_even_split(index_range, n_splits):
                 raise ValueError(f'Reached a negative remainder: {remainders}')
             splits.append(np.arange(start, start+to_add))
             start += to_add
-        return splits
+    return splits
 
 class LofarSplitter():
 
@@ -152,30 +152,24 @@ class LofarSplitter():
 
         if self.mount_images:
             sequence = LofarImgSequence
+            x_set, y_set, runs_range = window_runs(self.runs_per_classes.values(), self.classes_values_map.values(), self.window_size, self.stride)
             if self.nov_cls is None:
-                x_known, y_known, known_range = window_runs(self.runs_per_classes.values(), self.classes_values_map.values(), self.window_size, self.stride)
+                x_known, y_known, known_range = x_set, y_set, runs_range
             else:
-                runs_per_class = deepcopy(self.runs_per_classes)
-                classes_values_map = deepcopy(self.classes_values_map)
-                novelty_runs = runs_per_class.pop(self.nov_cls)
-                novelty_value = classes_values_map.pop(self.nov_cls)
-                x_known, y_known, known_range = window_runs(runs_per_class.values(), classes_values_map.values(), self.window_size, self.stride)
-                x_novelty, y_novelty, novelty_range = window_runs([novelty_runs], [novelty_value], self.window_size, self.stride)
-                del runs_per_class, classes_values_map, novelty_runs, novelty_value
+                x_known, y_known, known_range, x_novelty, y_novelty, novelty_range = self._remove_novelty(x_set, y_set, 
+                                                                                            runs_range, self.classes_values_map[self.nov_cls])
         else:
-            sequence = LofarImgSequence
+            sequence = LofarSequence
+            runs_range = np.concatenate(tuple(self.runs_per_classes.values()))
             if self.nov_cls is None:
                 x_known = self.lofar_data
                 y_known = self.labels
-                known_range = np.concatenate(tuple(self.runs_per_classes.values()))
+                known_range = runs_range
             else:
-                x_known = self.lofar_data[np.any(self.labels != self.classes_values_map[self.nov_cls], axis=-1)]
-                y_known = self.labels[np.any(self.labels != self.classes_values_map[self.nov_cls], axis=-1)]
-                x_novelty = self.lofar_data[np.all(self.labels == self.classes_values_map[self.nov_cls], axis=-1)]
-                y_novelty = self.labels[np.all(self.labels == self.classes_values_map[self.nov_cls], axis=-1)]
-                known_range = self._known_runs_range()
+                x_known, y_known, known_range, x_novelty, y_novelty, novelty_range = self._remove_novelty(self.lofar_data, self.labels, 
+                                                                            runs_range, self.classes_values_map[self.nov_cls])
         
-        for test_index, val_index, train_index in self.run_kfold_split(known_range, n_splits):
+        for test_index, val_index, train_index in self.run_kfold_split(known_range, n_splits, shuffle):
 
             #Collecting garbage
             gc.collect()
@@ -289,23 +283,8 @@ class LofarSplitter():
                 
                 yield class_out_name, run_out_index, x_test_seq, y_test, val_set, train_set
 
-    def _known_runs_range(self):
-        runs_per_class = deepcopy(self.runs_per_classes)
-        runs_per_class.pop(self.nov_cls)
-        unchanged_ranges = np.concatenate(tuple(runs_per_class.values()))
-        known_range = list()
-        current_range_start = 0
-        for unchanged_range in unchanged_ranges:
-            if unchanged_range[0] == current_range_start:
-                known_range.append(unchanged_range)
-            else:
-                new_range = range(current_range_start, len(unchanged_range))
-                known_range.append(new_range)
-            current_range_start += len(unchanged_range)
-        return known_range
-
     @staticmethod
-    def run_kfold_split(runs_range, n_splits, shuffle=True):
+    def run_kfold_split(runs_range, n_splits, shuffle=False):
 
         runs_splitted = list()
 
@@ -314,11 +293,8 @@ class LofarSplitter():
             if shuffle:
                 np.random.shuffle(splits)
             runs_splitted.append(splits)
-
+        
         runs_splitted = np.array(runs_splitted).T
-
-        if shuffle:
-            np.random.shuffle(runs_splitted)
 
         for test_split, val_split in zip(range(n_splits),utils.LoopRange(0,n_splits, num_samples=n_splits, initial_value=1)):
             splits_arr = np.arange(n_splits)
@@ -326,6 +302,11 @@ class LofarSplitter():
             test_index = np.hstack(runs_splitted[test_split])
             val_index = np.hstack(runs_splitted[val_split])
             train_index = np.hstack(np.hstack(runs_splitted[train_splits]))
+
+            if shuffle:
+                np.random.shuffle(test_index)
+                np.random.shuffle(val_index)
+                np.random.shuffle(train_index)
 
             yield test_index, val_index, train_index
 
@@ -360,6 +341,28 @@ class LofarSplitter():
                 test_run = train_runs_per_class[class_out_name].pop(run_out_index)
 
                 yield class_out_name, run_out_index, test_run, train_runs_per_class
+    
+    @staticmethod
+    def _rearrange_runs(runs_range):
+        new_runs_range = list()
+        current_range_start = 0
+        for run_range in runs_range:
+            if run_range[0] == current_range_start:
+                new_runs_range.append(run_range)
+            else:
+                new_range = range(current_range_start, current_range_start+len(run_range))
+                new_runs_range.append(new_range)
+            current_range_start += len(run_range)
+        return new_runs_range
+
+    def _remove_novelty(self, x_set, y_set, runs_range, novelty_label):
+        range_labels = np.array([y_set[run_range][0] for run_range in runs_range])
+        novelty_index = np.all(y_set == novelty_label, axis=-1)
+        known_index = np.logical_not(novelty_index)
+        x_known, y_known, known_range = x_set[known_index], y_set[known_index], self._rearrange_runs(runs_range[np.any(range_labels != novelty_label, axis=-1)])
+        x_novelty, y_novelty, novelty_range = x_set[novelty_index], y_set[novelty_index], self._rearrange_runs(runs_range[np.all(range_labels != novelty_label, axis=-1)])
+
+        return x_known, y_known, known_range, x_novelty, y_novelty, novelty_range
 
     def __print__(self):
         parameters = self.__dict__
