@@ -34,9 +34,9 @@ class MultiInitSequential():
 									sample_weight_mode=sample_weight_mode, weighted_metrics=weighted_metrics, target_tensors=target_tensors,
 									distribute=distribute, **kwargs)
 
-		return self._model.compile(optimizer, loss, metrics, loss_weights,
-						   sample_weight_mode, weighted_metrics, target_tensors,
-						   distribute, **kwargs)
+		return self._model.compile(optimizer=optimizer, loss=loss, metrics=metrics, loss_weights=loss_weights,
+						   sample_weight_mode=sample_weight_mode, weighted_metrics=weighted_metrics, target_tensors=target_tensors,
+						   distribute=distribute, **kwargs)
 	
 	def evaluate(self, x=None, y=None, batch_size=None, verbose=1, sample_weight=None, steps=None,
 				 callbacks=None, max_queue_size=10, workers=1, use_multiprocessing=False):
