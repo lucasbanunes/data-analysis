@@ -150,7 +150,7 @@ def multi_init_fit(model, x,
 		#Executing the functions
 		if not inits_functions is None:
 			for function in inits_functions:
-				function(model, init_dir)
+				function(init, model, init_dir)
 
 		#Updating the best model    
 		if init == 1 or metrics.optimized(best_metric, init_best_metric, mode):
