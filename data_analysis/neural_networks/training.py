@@ -16,7 +16,7 @@ from tensorflow.keras.models import load_model
 import tensorflow.keras.backend as K
 from data_analysis.utils import utils, metrics
 
-def multi_init_fit(model, x, 
+def multi_init_fit(model, compile_params, x, 
 					y=None, 
 					batch_size=None, 
 					epochs=1, 
@@ -113,6 +113,8 @@ def multi_init_fit(model, x,
 		else:
 			init_callbacks = deepcopy(callbacks)
 			init_callbacks.append(checkpoint)
+
+		model.compile(**deepcopy(compile_params))
 
 		if verbose:
 			print('---------------------------------------------------------------------------------------------------')

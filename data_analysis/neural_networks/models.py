@@ -170,7 +170,7 @@ class MultiInitSequential():
 			inits_log: dict with informations from the initializations
 		"""
 
-		self._model, log = training.multi_init_fit(self._model, x, y, batch_size, epochs, verbose, callbacks, validation_split, validation_data,
+		self._model, log = training.multi_init_fit(self._model, self.compile_params, x, y, batch_size, epochs, verbose, callbacks, validation_split, validation_data,
 													shuffle, class_weight, sample_weight, initial_epoch, steps_per_epoch, validation_steps,
 													validation_freq, max_queue_size, workers, use_multiprocessing, n_inits, init_metric, 
 													mode, inits_functions, save_inits, cache_dir)
