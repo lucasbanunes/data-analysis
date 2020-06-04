@@ -85,6 +85,10 @@ class _WrapperSequence(Sequence):
     def gradient_weights(self):
         return self.exp_set.gradient_weights()
 
+    def input_shape(self):
+        input_shape = self[0][0].shape[1:]
+        return input_shape
+
 def gradient_weights(y):
     """Returns a dict with a key for each class and each value a weight for that class.
     The weights are inversely propotional to the number of that class occurence:

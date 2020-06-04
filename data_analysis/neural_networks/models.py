@@ -240,7 +240,7 @@ class ExpertsCommittee():
 			Path to where to save the builder's cache
 		"""
 
-		self.cache_dir = cache_dir + 'expert_committee'
+		self.cache_dir = os.path.join(cache_dir, 'expert_committee')
 		self.experts = self._exp_formatting(classes, experts)
 		self.compile_params = None
 
@@ -314,7 +314,7 @@ class ExpertsCommittee():
 				expert.compile(**self.compile_params[class_])
 				cache_dir = os.path.join(self.cache_dir, 'experts', f'{class_}_expert')
 				
-				expert, experts_logs[class_] = training.multi_init_fit(model=expert, x=x[class_], epochs=epochs, verbose=verbose, callbacks=callbacks,
+				expert, experts_logs[class_] = training.multi_init_fit(compile_params=self.compile_params[class_], model=expert, x=x[class_], epochs=epochs, verbose=verbose, callbacks=callbacks,
 														validation_data=validation_data[class_], class_weight=class_weight[class_],
 														validation_freq=validation_freq, n_inits=n_inits, init_metric=init_metric[class_], 
 														inits_functions=inits_functions, mode=mode[class_],
