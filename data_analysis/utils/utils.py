@@ -173,39 +173,23 @@ def reshape_conv_input(data):
     return data.reshape(tuple(shape))
 
 def cast_to_python(var):
-    """Casts a variable with other packages types to its respective python type if possible and returns it"""
+    """Casts a variable from other packages types to a respective python type if possible and returns the new one"""
     typo = type(var)
-    if (typo == np.float32) or (typo == np.float64) or (typo == np.float16):
+    default_types = [int, float, str, bool]
+    if (typo in default_types) or (var is None):
+        return var
+    elif (typo == np.float32) or (typo == np.float64) or (typo == np.float16):
         return float(var)
     elif (typo == np.int16) or (typo == np.int32) or (typo == np.int64):
         return int(var)
-    elif typo == str:
-        return var
-    elif typo == int:
-        return var
-    elif typo == float:
-        return var
-    elif typo == bool:
-        return var
-    elif typo == type(None):
-        return None
+    elif (typo == list) or (typo == np.ndarray):
+        return [cast_to_python(value) for value in var]
+    elif typo == tuple:
+        return tuple([cast_to_python(value) for value in var])
+    elif typo == dict:
+        return {cast_to_python(key): cast_to_python(value) for key, value in var.items()}
     else:
         raise ValueError(f'{typo} casting is not supported')
-
-def cast_dict_to_python(dictionary):
-    """Casts a dict with key and values with other packages types to its respective python type if possible and returns it."""
-    d = dict()
-    for key, value in dictionary.items():
-        if type(value) == list or type(value) == np.ndarray:
-            d[key] = [cast_to_python(var) for var in value]
-        elif type(value) == dict:
-            d[key] = cast_dict_to_python(value)
-        elif type(value) == tuple:
-            d[key] = (cast_to_python(var) for var in value)
-        else:
-            d[key] = cast_to_python(value)
-
-    return d
 
 def to_sparse_tanh(y, num_classes=None):
     if num_classes is None:

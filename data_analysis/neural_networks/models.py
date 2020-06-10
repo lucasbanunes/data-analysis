@@ -15,7 +15,7 @@ from tensorflow import keras
 from tensorflow.keras.models import Sequential, load_model, save_model
 from data_analysis.utils import utils
 from data_analysis.neural_networks import training
-from data_analysis.utils.utils import frame_from_history, DataSequence, gradient_weights, _WrapperSequence, cast_dict_to_python
+from data_analysis.utils.utils import frame_from_history, DataSequence, gradient_weights, _WrapperSequence, cast_to_python
 
 class MultiInitSequential():
 	"""Alias for keras.Sequential model but with adittional functionalities"""
@@ -183,9 +183,9 @@ class MultiInitSequential():
 	def _save_history(folderpath, callback):
 		"""Saves the dicts from keras.calbacks.History as json files"""
 		with open(os.path.join(folderpath, 'fitting_params.json'), 'w') as json_file:
-			json.dump(cast_dict_to_python(callback.params), json_file, indent=4)
+			json.dump(cast_to_python(callback.params), json_file, indent=4)
 		with open(os.path.join(folderpath, 'fitting_metrics.json'), 'w') as json_file:
-			json.dump(cast_dict_to_python(callback.history), json_file, indent=4)
+			json.dump(cast_to_python(callback.history), json_file, indent=4)
 
 	@staticmethod
 	def _optimized(best, current, mode):

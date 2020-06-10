@@ -145,9 +145,9 @@ def multi_init_fit(model, compile_params, x,
 
 		if save_inits:
 			with open(os.path.join(init_dir, 'fitting_params.json'), 'w') as json_file:
-				json.dump(utils.cast_dict_to_python(init_callback.params), json_file, indent=4)
+				json.dump(utils.cast_to_python(init_callback.params), json_file, indent=4)
 			with open(os.path.join(init_dir, 'fitting_metrics.json'), 'w') as json_file:
-				json.dump(utils.cast_dict_to_python(init_callback.history), json_file, indent=4)
+				json.dump(utils.cast_to_python(init_callback.history), json_file, indent=4)
 
 		#Executing the functions
 		if not inits_functions is None:
@@ -173,9 +173,9 @@ def multi_init_fit(model, compile_params, x,
 	best_dir = os.path.join(cache_dir, 'best_model')
 	shutil.copytree(best_model, os.path.join(best_dir, 'model'))
 	with open(os.path.join(best_dir, 'fitting_params.json'), 'w') as json_file:
-		json.dump(utils.cast_dict_to_python(init_callback.params), json_file, indent=4)
+		json.dump(utils.cast_to_python(init_callback.params), json_file, indent=4)
 	with open(os.path.join(best_dir, 'fitting_metrics.json'), 'w') as json_file:
-		json.dump(utils.cast_dict_to_python(init_callback.history), json_file, indent=4)
+		json.dump(utils.cast_to_python(init_callback.history), json_file, indent=4)
 
 	if not save_inits:
 		shutil.rmtree(os.path.join(cache_dir, 'inits_models'))
