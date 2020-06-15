@@ -56,11 +56,8 @@ def get_results(predictions,
         novelty_index: int
             Number of the label that is treated as novelty
 
-        save_csv: boolean
-            If true saves the data frame as a .csv file
-
         filepath: string
-            Where to save the .csv file
+            Where to save the .csv file. Defaults to None and if that happens the frame is not saved.
 
         Returns:
 
@@ -98,8 +95,7 @@ def get_results(predictions,
 
 def get_novelty_eff(results_frame,
                     sample_weight=None, 
-                    filepath = None,
-                    verbose = False):
+                    filepath = None):
     """
     returns a data frame with several parameters of efficiency for novelty detection
 
@@ -107,15 +103,12 @@ def get_novelty_eff(results_frame,
 
     results_frame: pandas.DataFrame
         frame obtained from get_results function
-
-    save _csv: boolean
-        if true saves the data frame as a .csv file
+    
+    sample_weight: list
+        Sample weights for recall and precision
 
     filepath: string
-        where to save the .csv file
-    
-    verbose: boolean
-        if true gives output of the function's activity
+        Where to save the .csv file. Defaults to None and if that happens the frame is not saved.
     
     Return
         eff_frame: pandas.DataFrame
@@ -151,12 +144,15 @@ def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), area=True, fil
         If true calculates  and marks the auc showing its value
 
     filepath: str
-        Path to save the plot
+        Path to save the plot. Dafaults to None and if so the figure is not saved.
 
     Returns:
         
     fig: matplotlib.Figure
         Figure with the plot
+    
+    axis:
+        axis with the plot
     """
 
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
@@ -180,7 +176,7 @@ def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), area=True, fil
     if not filepath is None:
         fig.savefig(fname=filepath, dpi=200, format='png')
     plt.close(fig)
-    return fig
+    return fig, axis
 
 def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=None):
     """Plot noc curve fro given results_frame
@@ -196,14 +192,16 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
     figsize: tuple
         Tuple with the size of the matplotlib.Figure
 
-
     filepath: str
-        Path to save the plot
+        Path to save the plot. Dafaults to None and if so the figure is not saved.
 
     Returns:
         
     fig: matplotlib.Figure
         Figure with the plot
+    
+    axis:
+        axis with the plot
     """
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
     novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
@@ -220,7 +218,7 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
     if not filepath is None:
         fig.savefig(fname=filepath, dpi=200, format='png')
     plt.close(fig)
-    return fig
+    return fig, axis
 
 def get_recall_score(results_frame):
     """Computes recall_score for wach threshold for given frame."""

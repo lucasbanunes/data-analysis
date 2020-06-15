@@ -103,6 +103,25 @@ def most_even_split(index_range, n_splits):
     return splits
 
 class LofarSplitter():
+    """ Splitter for LOFAR data
+    Attributes:
+    
+    lofar_data: numpy.ndarray
+        Array with all the lofar spectres
+    
+    labels: numpy.ndarray
+        Array with the correct labels of the lofar_data
+    
+    runs_per_classes: dict
+        Dictionary that maps a key with the name of the class to a list with the
+        runs range
+    
+    classes_values_map: dict
+        Dictionary that maps the classes names to its values
+    
+    nov_cls: str
+        Name of the class to be treated as novelty. Defaults to None and
+        if so no class is tretaed as novelty."""
 
     def __init__(self, lofar_data, labels, runs_per_classes, classes_values_map):
         self.lofar_data = lofar_data
@@ -112,7 +131,36 @@ class LofarSplitter():
         self._compiled = False
         self.nov_cls = None
 
-    def compile(self, test_batch, train_batch, val_batch=None, val_percentage=None, window_size=None, stride=None, convolutional_input=True):
+    def compile(self, test_batch, train_batch, val_batch, val_percentage=None, window_size=None, stride=None, convolutional_input=True):
+        """ Compiles the splitter with the given parameters
+
+        Parameters:
+
+        test_batch: int
+            Number of samples in a test batch
+
+        train_batch: int
+            Number of samples in a train batch
+
+        val_batch: int
+            Number of samples in a val batch
+        
+        val_percentage: float
+            Percentage from .0 to 1.0 of the training data that will be treated as validation_data.
+            Defaults to None and if so the val_percentage is 0
+        
+        window_size: int
+            If a value is passed images are mounted from the runs as a sliding window with size window_size.
+            Defaults to None and if so the images are not mounted
+        
+        stride: int
+            If a value is passed images are mounted from the runs as a slinding window that slides a step
+            with stride size. Defaults to None
+        
+        convolutional_input: bool
+            If True adds ans extra dim to the mountes images to fit convolutional layers from keras.
+        """
+
         self.test_batch = test_batch
         self.train_batch = train_batch
         self.val_batch = val_batch
@@ -137,6 +185,18 @@ class LofarSplitter():
         self._compiled = True
         
     def set_novelty(self, nov_cls, to_known_value):
+        """Sets the data novelty class
+
+        Parameters:
+
+        nov_cls: str
+            Name of the class to be treated as novelty
+        
+        to_known_value: callable
+            Callable that recieves the value of a non novelty class and returns a new value with
+            the novelty class treated as novelty.
+        """
+
         if nov_cls in self.classes_values_map.keys():
             self.nov_cls = nov_cls
         else:
@@ -146,9 +206,30 @@ class LofarSplitter():
         else:
             raise ValueError('The to_known_value parameter must be callable')
 
-    def kfold_split(self, n_splits, shuffle=False, random_state=None):
+    def kfold_split(self, n_splits=3, shuffle=False):
+        """ Cross validation method realized on the lofar data.
+        This method consists into dividing each run into n_splits in the most equal manner possible.
+        Then, one split is selected for test, other for validation and the rest for training, therefore n_splits minimun is 3.
+        Each correleated split from each run is then shuffled with the others resulting in the final test, val and training sets.
+        If a novelty class is defined, it is added to the test set int the end.
+
+        Parameters:
+
+        n_splits: int > 3
+            Number of splits to be made to the data
+
+        shuffle: bool
+            If True shuffles the data
+
+        Yields:
+
+        x_test, y_test, val_set, y_set
+        """
         if not self._compiled:
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
+
+        if n_splits<3:
+            raise ValueError('The minimun number of splits is 3.')
 
         if self.mount_images:
             sequence = LofarImgSequence
@@ -201,6 +282,21 @@ class LofarSplitter():
             yield test_seq, y_test, val_seq, train_seq
 
     def leave1run_out_split(self, shuffle=True):
+        """Crosss validation method realized on the lofar data.
+        This method treates the test data as one run for each loop and the rest as train data (a percentage can be
+        treated as validation data if val_percentage was passed in self.compile).
+        If a novelty class is defined it ts added to the test set.
+
+        Parameters:
+
+        shuffle: bool
+            If true shuffles the data
+        
+        Yields:
+
+        x_test, y_test, val_set, y_set
+        """
+        
         if not self._compiled:
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
 
