@@ -252,3 +252,14 @@ class NumericalIntegration():
             area += (y[k]+y[k-1]) * dx / 2
 
         return area
+
+def second_max(iterable):
+    max_item = max(iterable)
+    if iterable[0] == max_item:
+        second = iterable[1]
+    else:
+        second = iterable[0]
+    for item in iterable:
+        if item > second and item < max_item:
+            second = item
+    return second
