@@ -9,7 +9,7 @@ def normalize(lofar_data, runs, order):
     normalized_lofar_data = list()
     for run in runs:
         lofar_run = lofar_data[run]
-        normalized_lofar_data.append(keras.utils.normalize(lofar_run, order))
+        normalized_lofar_data.append(keras.utils.normalize(lofar_run, order=order))
     
     return np.concatenate(normalized_lofar_data, axis=0)
 
