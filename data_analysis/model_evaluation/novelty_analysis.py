@@ -35,7 +35,7 @@ def get_results(predictions,
         """
         Creates a pandas.DataFrame with the events as rows and the output of the neurons in the output layer, 
         the classification for each threshold and the labels as columns.
-        It uses winner takeas all method for classification and a threshold on the output layer for 
+        It uses winner takes all method for classification and a threshold on the output layer for 
         novelty detection.
 
         Parameters
@@ -221,14 +221,23 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
     return fig, axis
 
 def get_recall_score(results_frame):
-    """Computes recall_score for wach threshold for given frame."""
+    """Computes recall_score for each threshold for both novelty detection and known data.
+        Returns a (len(threshold), 2) shape ndarray where index[0] is recall for known class and index[1] for novelty class."""
     y_true, novelty_matrix = _get_as_binary(results_frame)
     return np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
 
-def get_accuracy_score(results_frame):
-    """Computes accuracy_score for wach threshold for given frame."""
+def nov_accuracy_score(results_frame):
+    """Computes accuracy_score for each threshold"""
     y_true, novelty_matrix = _get_as_binary(results_frame)
     return np.apply_along_axis(lambda x: accuracy_score(y_true, x), 0, novelty_matrix)
+
+def classf_accuracy_score(results_frame):
+    """Computes classification accuracy for each threshold"""
+    labels = results_frame.loc[:, 'Labels'].values.flatten()
+    pred_matrix = results_frame.loc[:, 'Classification'].values
+    classf_true = labels[labels != 'Nov']
+    classf_pred = pred_matrix[labels != 'Nov']
+    return np.apply_along_axis(lambda x: accuracy_score(classf_true, x), axis=0, arr=classf_pred)
 
 def _get_as_binary(results_frame):
     """Gets novelty matrix from the frame as binary, 1 for novelty, 0 for known."""
