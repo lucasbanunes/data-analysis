@@ -93,38 +93,48 @@ def get_results(predictions,
             novelty_frame.to_csv(filepath, index = False)
         return novelty_frame
 
-def get_novelty_eff(results_frame,
-                    sample_weight=None, 
+def evaluate_nov_detection(results_frame,
+                    metrics = None, 
                     filepath = None):
     """
-    returns a data frame with several parameters of efficiency for novelty detection
+    Creates a data frame with accuracy evaluated for novelty detection, classification and for classfication
+    of each class, trigger rate and novelty rate. Other metrics can be passed and added to the frame.
 
     Parameters
 
     results_frame: pandas.DataFrame
         frame obtained from get_results function
     
-    sample_weight: list
-        Sample weights for recall and precision
+    metrics: list
+        functions that recieve results_frame as a parameter and return a array with it metric calculated
+        for each threshold.
 
     filepath: string
-        Where to save the .csv file. Defaults to None and if that happens the frame is not saved.
+        Where to save the frame as a .csv file. Defaults to None and if that happens the frame is not saved.
     
     Return
-        eff_frame: pandas.DataFrame
+        eval_frame: pandas.DataFrame
     """
-    y_true = np.where(results_frame.loc[:, 'Labels'].values == 'Nov', 1, 0)     #Novelty is 1, known data is 0
-    novelty_matrix = np.where(results_frame.loc[:'Classification'] == 'Nov', 1, 0)
-    threshold = results_frame.loc[:, 'Classification'].columns.values.flatten()
-    recall = np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None, sample_weight=sample_weight), 0, novelty_matrix)
-    precision = np.apply_along_axis(lambda x: precision_score(y_true, x, labels = [0,1], average=None, sample_weight=sample_weight), 0, novelty_matrix)
-    nov_eff_frame = pd.DataFrame(np.vstack((recall, precision)), columns = ['Recall', 'Precision'], index=pd.MuliIndex.from_product([['Known', 'Nov'], threshold], names=('Class', 'Threshold')))
+    columns = results_frame.loc[:, 'Classification'].columns.values.flatten()
+    classes = np.unique(results_frame.loc[:, 'Labels'].values.flatten())
+    known_classes = classes[classes != 'Nov']
+    index = ['Nov acc', 'Classf acc', 'Trigger rate', 'Nov rate']
+    data = [nov_accuracy_score(results_frame), classf_accuracy_score(results_frame)]
+    data.extend(list(get_recall_score(results_frame)))
+    for class_ in known_classes:
+        index.append(f'{class_} Acc')
+        data.append(_class_acc_per_class(results_frame, class_))
+    if not metrics is None:
+        for metric in metrics:
+            index.append(metric.__name__)
+            data.append(metric(results_frame))
+    eval_frame = pd.DataFrame(data, index=index, columns=columns)
     if not filepath is None:
         folder, _ = os.path.split(filepath)
         if not os.path.exists(folder):
             os.makedirs(folder)
-        nov_eff_frame.to_csv(filepath, index = False)
-    return nov_eff_frame    
+        eval_frame.to_csv(filepath, index = False)
+    return eval_frame    
 
 def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), area=True, filepath=None):
     """Plot noc curve fro given results_frame
