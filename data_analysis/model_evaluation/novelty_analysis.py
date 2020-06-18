@@ -239,6 +239,32 @@ def classf_accuracy_score(results_frame):
     classf_pred = pred_matrix[labels != 'Nov']
     return np.apply_along_axis(lambda x: accuracy_score(classf_true, x), axis=0, arr=classf_pred)
 
+def classf_accuracy_per_class(results_frame, class_=None):
+    """Computes classification accuracy for each threshold for a specific class if a class is passed.
+    If no class_ parameter is passed the accuracy is computed for each classed and returned in sorted order"""
+    if class_ is None:
+        classes = np.unique(results_frame.loc[:, 'Labels'].values.flatten())
+        known_classes = classes[classes != 'Nov']
+        acc = list()
+        for class_ in known_classes:
+            acc.append(_class_acc_per_class(results_frame, class_))
+        return np.array(acc)
+    else:
+        return _class_acc_per_class(results_frame, class_)
+
+def _class_acc_per_class(results_frame, class_):
+    pred_matrix = results_frame.loc[:, 'Classification'].values
+    labels = results_frame.loc[:, 'Labels'].values.flatten()
+    class_labels = labels[labels == class_]
+    class_pred = pred_matrix[labels == class_]
+    return np.apply_along_axis(lambda x: accuracy_score(class_labels, x), axis=0, arr=class_pred)    
+
+def noc_auc_score(results_frame):
+    """Computes noc auc for given array of thresholds in a results_frame"""
+    trigger, novelty_rate = get_recall_score(results_frame)
+    noc_auc = NumericalIntegration.trapezoid_rule(novelty_rate, trigger)
+    return noc_auc
+
 def _get_as_binary(results_frame):
     """Gets novelty matrix from the frame as binary, 1 for novelty, 0 for known."""
     y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
