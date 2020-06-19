@@ -160,7 +160,6 @@ def reshape_conv_input(data):
     
     shape = list(data.shape)
     shape.append(1)
-    data.reshape(tuple(shape))
     return data.reshape(tuple(shape))
 
 def cast_to_python(var):
