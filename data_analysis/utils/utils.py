@@ -129,34 +129,25 @@ def frame_from_history(dict_):
     return frame
 
 def shuffle_pair(x, y):
-    """Shuffles a pair of data"""
-    pair = list(zip(x, y))
-    np.random.shuffle(pair)
-    x=list()
-    y=list()
-    for x_value, y_value in pair:
-        x.append(x_value)
-        y.append(y_value)
-    
-    return np.array(x), np.array(y)
+    """Shuffles a pair of data. Thre returned data will be a ndarray"""
+    if not ((type(x) is np.ndarray) and (type(y) is np.ndarray)):
+        x = np.array(x)
+        y = np.array(y)
 
-def sort_pair(x, y, sort_to='x'):
-    if sort_to == 'x':
-        guide = x
-        guided = y
-    elif sort_to == 'y':
-        guide = y
-        guided = x
-    else:
-        raise ValueError
-    sorted_guide = np.sort(guide)
-    sorted_guided = np.empty(len(guided), dtype=guided.dtype)
-    indexes = np.arange(len(guided), dtype=np.int64)
-    for index in indexes:
-        correct_index = indexes[sorted_guide == guide[index]]
-        sorted_guided[correct_index] = guide[index]
+    index = np.arange(len(x))
+    np.random.shuffle(index)
 
-    return guide, guided
+    return x[index], y[index]
+
+def sort_pair(x, y):
+    """Sorts a pair using x as source for sorting."""
+    if not ((type(x) is np.ndarray) and (type(y) is np.ndarray)):
+        x = np.array(x)
+        y = np.array(y)
+
+    sorted_index = x.argsort(axis=0)
+
+    return x[sorted_index], y[sorted_index]
 
 def reshape_conv_input(data):
     """Returns an numpy.ndarray reshaped as an input for a convolutional layer from keras
