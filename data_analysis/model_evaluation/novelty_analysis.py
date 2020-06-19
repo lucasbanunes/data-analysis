@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import recall_score, accuracy_score, precision_score
-from data_analysis.utils.utils import NumericalIntegration
+from data_analysis.utils import math_utils
 
 def create_threshold(quantity, 
                      interval):
@@ -177,7 +177,7 @@ def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), area=True, fil
     axis.plot(novelty_rate, trigger, color='k')
     axis.grid(color='k', alpha=0.5, linestyle='dashed', linewidth=0.5)
     if area:
-        noc_area = NumericalIntegration.trapezoid_rule(novelty_rate, trigger)
+        noc_area = math_utils.trapezoid_integration(novelty_rate, trigger)
         noc_area = round(noc_area, 3)
         axis.fill_between(novelty_rate, trigger, interpolate=True, color='#808080')
         plt.text(0.3, 0.25, f'Area = {noc_area}',
@@ -272,7 +272,7 @@ def _class_acc_per_class(results_frame, class_):
 def noc_auc_score(results_frame):
     """Computes noc auc for given array of thresholds in a results_frame"""
     trigger, novelty_rate = get_recall_score(results_frame)
-    noc_auc = NumericalIntegration.trapezoid_rule(novelty_rate, trigger)
+    noc_auc = math_utils.trapezoid_integration(novelty_rate, trigger)
     return noc_auc
 
 def _get_as_binary(results_frame):

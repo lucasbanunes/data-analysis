@@ -230,19 +230,6 @@ class LoopRange():
             return num
         raise StopIteration
 
-class NumericalIntegration():
-    def __init__(self):
-        pass
-
-    @staticmethod
-    def trapezoid_rule(x, y):
-        area = 0
-        for k in range(1, len(x)):
-            dx = x[k]-x[k-1]
-            area += (y[k]+y[k-1]) * dx / 2
-
-        return area
-
 def sec_argmax(arr):
     """Returns the index of the second maximum value in arr"""
     if not (type(arr) is np.ndarray):
