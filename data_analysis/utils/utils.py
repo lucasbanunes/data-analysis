@@ -243,13 +243,16 @@ class NumericalIntegration():
 
         return area
 
-def second_max(iterable):
-    max_item = max(iterable)
-    if iterable[0] == max_item:
-        second = iterable[1]
-    else:
-        second = iterable[0]
-    for item in iterable:
-        if item > second and item < max_item:
-            second = item
-    return second
+def sec_argmax(arr):
+    """Returns the index of the second maximum value in arr"""
+    if not (type(arr) is np.ndarray):
+        arr = np.array(arr)
+    
+    return arr.argsort(axis=0)[-2]
+
+def sec_argmin(arr):
+    """Returns the index of the second minimum value in arr"""
+    if not (type(arr) is np.ndarray):
+        arr = np.array(arr)
+    
+    return arr.argsort(axis=0)[1]

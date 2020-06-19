@@ -30,7 +30,7 @@ def wta_classf_analysis(output, labels):
         num_events = np.sum(unique_counts)
         num_correct_classf = unique_counts[unique_classf == class_][0]
         num_misclassf = np.sum(unique_counts[unique_classf != class_])
-        num_most_misclassf = utils.second_max(unique_counts)
+        num_most_misclassf = unique_counts[utils.sec_argmax(unique_counts)]
         most_misclassf_class = unique_classf[unique_counts == num_most_misclassf][0]
         class_neuron_output = output[labels == class_].T[class_index]
         avg = np.sum(class_neuron_output)/len(class_neuron_output)
