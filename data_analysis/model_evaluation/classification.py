@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from data_analysis.utils import utils
 
-def wta_classf_analysis(output, labels):
+def wta_classf_analysis(output, labels, classes = None):
     """Function to analise the classification and neuron output fromn a neural network classifier
     using winner takes all method (wta). It is made considering the alphabetical or numerical order of the labels.
     This means that the first neuron will be the first class in sorted order and so forth. 
@@ -16,12 +16,16 @@ def wta_classf_analysis(output, labels):
 
     labels: numpy.ndarray
         Target classification
+    
+    classes: numpy.ndarray
+        Array where index i is the class from neuron i. If nothing is passed the classes are obtained from numpy.unique(labels)
 
     Returns:
     frame: pandas.DataFrame
         Frame with the class as rows and the columns as the metrics
     """
-    classes = np.unique(labels)
+    if classes is None:
+        classes = np.unique(labels)
     classf = classes[np.argmax(output, axis=1)]
     data = list()
     for class_index in range(len(classes)):
