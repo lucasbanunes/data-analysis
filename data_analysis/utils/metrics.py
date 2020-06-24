@@ -1,3 +1,35 @@
+import numpy as np
+import sklearn as sk
+
+def sp_index(y_true, y_pred, classes=None):
+    """Calculates the Sum-product index for the given predicted data.
+
+    Parameters:
+
+    y_true: numpy.ndarray
+        True classification of the data
+
+    y_pred: numpy.ndarray
+        Predicted classification of the data
+    
+    classes: numpy.ndarray
+        Classes to be considered, defaults to the unique values in y_true
+
+    Returns:
+
+    sp: numpy.float64
+        The computed metric
+    """
+    
+    if classes is None:
+        classes = np.unique(y_true)
+
+    num_classes = len(classes)
+    recall_score = sk.metrics.recall_score(y_true, y_pred, labels=classes)
+    sp = np.sqrt((np.sum(recall_score)/num_classes)*(np.power(np.product(recall_score), 1/num_classes)))
+
+    return sp
+
 def optimized(best_metric, current_metric, mode):
     """Checks if a metric has been optimized based on the given mode
 
