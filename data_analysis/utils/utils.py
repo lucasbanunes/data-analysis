@@ -243,3 +243,8 @@ def sec_argmin(arr):
         arr = np.array(arr)
     
     return arr.argsort(axis=0)[1]
+
+def sort_dict(dictionary):
+    """Sorts a dictionary using key order"""
+    keys, values = sort_pair(dictionary.keys(), dictionary.values())
+    return {key: value for key, value in zip(keys,values)}
