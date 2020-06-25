@@ -5,6 +5,60 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import recall_score, accuracy_score, precision_score
 from data_analysis.utils import math_utils
 
+def svm_get_results(predictions, labels, nov_label, classes_names, filepath=None):
+    """Generates a frame with the results for novelty detection and classification for a 
+    SVM committee using One vs Rest classification.
+
+    Parameters:
+    
+    predictions: numpy.ndarray
+        Array with shape (n_samples, n_classes) with the predictions from the committee
+    
+    labels: numpy.ndarray
+        True labels for predictions
+    
+    nov_label: int
+        Label of the novelty data
+
+    classes_names: 1-d array like
+        Array with the classes names according to predictions. Column 0 is the predictions
+        for the class classes_names[0]
+    
+    filepath: str
+        Filepath to save a csv file of the frame
+
+    Returns:
+    
+    results_frame: pandas.DataFrame
+        Frame with the data having the predictions array, and more two columns for true and 
+        predicted labels
+    """
+    
+    supported_types = [np.int16, np.int32, np.int64]
+    if not labels.dtype in supported_types:
+        raise TypeError(f'The labels array must be of the following types {supported_types} the type {labels.dtype} was passed')
+    del supported_types
+
+    novelty_detec = np.all(predictions == -1, axis=1)
+    classf = classes_names[np.argmax(predictions, axis=1)]
+    nov_and_classf = np.where(novelty_detec, 'Nov', classf)
+    columns = [f'Class_{class_}' for class_ in classes_names]
+    columns.extend(['True', 'Pred'])
+    classes_names = list(classes_names)
+    classes_names.insert(nov_label, 'Nov')
+    classes_names = np.array(classes_names)
+    y_true = classes_names[labels]
+    data = np.concatenate((predictions, y_true, nov_and_classf), axis=1)
+    results_frame = pd.DataFrame(data, columns=columns)
+
+    if not filepath is None:
+        folder, _ = os.path.split(filepath)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        results_frame.to_csv(filepath, index = False)
+
+    return results_frame
+
 def create_threshold(quantity, 
                      interval):
         """
