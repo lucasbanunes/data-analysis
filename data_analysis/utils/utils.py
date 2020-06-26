@@ -260,5 +260,5 @@ def sec_argmin(arr):
 
 def sort_dict(dictionary):
     """Sorts a dictionary using key order"""
-    keys, values = sort_pair(dictionary.keys(), dictionary.values())
+    keys, values = sort_pair(list(dictionary.keys()), list(dictionary.values()))
     return {key: value for key, value in zip(keys,values)}
