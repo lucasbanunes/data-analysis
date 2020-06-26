@@ -63,7 +63,7 @@ def most_even_split(index_range, n_splits):
     The range(13) object can be seen as
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     divided in 5 splits could happen in any number of ways but this method splits it the most 
-    even way possible that is two splits with 2 events and 3 wplits with 3 elements.
+    even way possible that is two splits with 2 events and 3 splits with 3 elements.
 
     Parameters:
 
@@ -128,26 +128,16 @@ class LofarSplitter():
         self.labels = labels
         self.runs_per_classes = runs_per_classes
         self.classes_values_map = classes_values_map
-        self._compiled = False
+        self.val_percentage = 0
         self.nov_cls = None
 
-    def compile(self, test_batch, train_batch, val_batch, val_percentage=None, window_size=None, stride=None, convolutional_input=True):
+    def compile(self, val_percentage=0, window_size=None, stride=None):
         """ Compiles the splitter with the given parameters
 
         Parameters:
 
-        test_batch: int
-            Number of samples in a test batch
-
-        train_batch: int
-            Number of samples in a train batch
-
-        val_batch: int
-            Number of samples in a val batch
-        
-        val_percentage: float
-            Percentage from .0 to 1.0 of the training data that will be treated as validation_data.
-            Defaults to None and if so the val_percentage is 0
+        val_percentage: float or int
+            Percentage from .0 to 1.0 of the training data that will be treated as validation_data. Defaults to zero
         
         window_size: int
             If a value is passed images are mounted from the runs as a sliding window with size window_size.
@@ -156,32 +146,15 @@ class LofarSplitter():
         stride: int
             If a value is passed images are mounted from the runs as a slinding window that slides a step
             with stride size. Defaults to None
-        
-        convolutional_input: bool
-            If True adds ans extra dim to the mountes images to fit convolutional layers from keras.
         """
-
-        self.test_batch = test_batch
-        self.train_batch = train_batch
-        self.val_batch = val_batch
-        if val_percentage == 0:
-            self.val_percentage = None
+        
+        self.val_percentage = val_percentage
+        if (not window_size is None) and (not stride is None):
+            self.mount_images = True
+            self.window_size = int(window_size)
+            self.stride = int(stride)
         else:
-            self.val_percentage = float(val_percentage)
-        self.window_size = window_size
-        self.stride = stride
-        if self.window_size is None:
-            self.mount_images=False
-        else:
-            self.mount_images=True
-        self.convolutional_input = convolutional_input
-        if self.mount_images:
-            if self.convolutional_input:
-                self.input_shape = (window_size, self.lofar_data.shape[-1], 1)
-            else:
-                self.input_shape = (window_size, self.lofar_data.shape[-1])
-        else:
-            self.input_shape = self.lofar_data[0].shape
+            self.mount_images = False
         self._compiled = True
         
     def set_novelty(self, nov_cls, to_known_value):
@@ -216,14 +189,14 @@ class LofarSplitter():
         Parameters:
 
         n_splits: int > 3
-            Number of splits to be made to the data
+            Number of splits to be made
 
         shuffle: bool
             If True shuffles the data
 
         Yields:
 
-        x_test, y_test, val_set, y_set
+        x_test, y_test, x_val, y_val, x_train, y_train
         """
         if not self._compiled:
             raise NameError('The output parameters must be defined before calling this method. define them by using the compile method.')
@@ -232,7 +205,6 @@ class LofarSplitter():
             raise ValueError('The minimun number of splits is 3.')
 
         if self.mount_images:
-            sequence = LofarImgSequence
             x_set, y_set, runs_range = window_runs(self.runs_per_classes.values(), self.classes_values_map.values(), self.window_size, self.stride)
             if self.nov_cls is None:
                 x_known, y_known, known_range = x_set, y_set, runs_range
@@ -240,7 +212,6 @@ class LofarSplitter():
                 x_known, y_known, known_range, x_novelty, y_novelty, novelty_range = self._remove_novelty(x_set, y_set, 
                                                                                             runs_range, self.classes_values_map[self.nov_cls])
         else:
-            sequence = LofarSequence
             runs_range = np.concatenate(tuple(self.runs_per_classes.values()))
             if self.nov_cls is None:
                 x_known = self.lofar_data
@@ -267,19 +238,17 @@ class LofarSplitter():
                 x_test = np.concatenate((x_novelty, x_known[test_index]), axis=0)
                 y_test = np.concatenate((y_novelty, y_known[test_index]), axis=0)
                 #Compensating from the class taken out as novelty
-                y_train = np.apply_along_axis(self.to_known_value, axis=-1, arr=y_train)
-                y_val = np.apply_along_axis(self.to_known_value, axis=-1, arr=y_val)
+                if len(y_train.shape) > 1:
+                    y_train = np.apply_along_axis(self.to_known_value, axis=-1, arr=y_train)
+                    y_val = np.apply_along_axis(self.to_known_value, axis=-1, arr=y_val)
+                else:
+                    y_train = np.array([self.to_known_value(label) for label in y_train])
+                    y_val = np.array([self.to_known_value(label) for label in y_val])
             
-            test_seq = sequence(lofar_data=self.lofar_data, x_set=x_test, y_set=y_test, batch_size=self.test_batch, 
-                                convolutional_input=self.convolutional_input)
-
-            val_seq = sequence(lofar_data=self.lofar_data, x_set=x_val, y_set=y_val, batch_size=self.val_batch, 
-                                convolutional_input=self.convolutional_input)
-
-            train_seq = sequence(lofar_data=self.lofar_data, x_set=x_train, y_set=y_train, batch_size=self.train_batch, 
-                                convolutional_input=self.convolutional_input)
-            
-            yield test_seq, y_test, val_seq, train_seq
+            if shuffle:
+                x_test, y_test = utils.shuffle_pair(x_test, y_test)
+                    
+            yield x_test, y_test, x_val, y_val, x_train, y_train
 
     def leave1run_out_split(self, shuffle=True):
         """Crosss validation method realized on the lofar data.
@@ -358,14 +327,14 @@ class LofarSplitter():
             if shuffle:
                 x_fit, y_fit = utils.shuffle_pair(x_fit, y_fit)
 
-            if self.val_percentage is None:
+            if np.math.isclose(self.val_percentage, 0.0):
                 #The percentage is treated as 0%
                 train_set = sequence(lofar_data=self.lofar_data, x_set=x_fit, y_set=y_fit, batch_size=self.train_batch,
                                      convolutional_input=self.convolutional_input)
                 
                 yield class_out_name, run_out_index, x_test_seq, y_test, train_set
             else:
-                val_split = math.ceil(len(x_fit)*self.val_percentage)
+                val_split = np.math.ceil(len(x_fit)*self.val_percentage)
                 x_val = x_fit[:val_split]
                 y_val = y_fit[:val_split]
                 x_train = x_fit[val_split:]
@@ -453,10 +422,16 @@ class LofarSplitter():
 
     def _remove_novelty(self, x_set, y_set, runs_range, novelty_label):
         range_labels = np.array([y_set[run_range][0] for run_range in runs_range])
-        novelty_index = np.all(y_set == novelty_label, axis=-1)
+        if len(y_set.shape) > 1:
+            novelty_index = np.all(y_set == novelty_label, axis=-1)
+            novelty_range_index = np.all(range_labels != novelty_label, axis=-1)
+        else:
+            novelty_index = y_set == novelty_label
+            novelty_range_index = range_labels == novelty_label
         known_index = np.logical_not(novelty_index)
-        x_known, y_known, known_range = x_set[known_index], y_set[known_index], self._rearrange_runs(runs_range[np.any(range_labels != novelty_label, axis=-1)])
-        x_novelty, y_novelty, novelty_range = x_set[novelty_index], y_set[novelty_index], self._rearrange_runs(runs_range[np.all(range_labels != novelty_label, axis=-1)])
+        known_range_index = np.logical_not(novelty_range_index)
+        x_known, y_known, known_range = x_set[known_index], y_set[known_index], self._rearrange_runs(runs_range[known_range_index])
+        x_novelty, y_novelty, novelty_range = x_set[novelty_index], y_set[novelty_index], self._rearrange_runs(runs_range[novelty_range_index])
 
         return x_known, y_known, known_range, x_novelty, y_novelty, novelty_range
 
