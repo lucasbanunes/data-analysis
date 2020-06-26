@@ -1,9 +1,10 @@
 import os
+import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import recall_score, accuracy_score, precision_score
-from data_analysis.utils import math_utils
+from data_analysis.utils import math_utils, utils
 
 def svm_get_results(predictions, labels, nov_label, classes_names, filepath=None):
     """Generates a frame with the results for novelty detection and classification for a 
@@ -58,6 +59,41 @@ def svm_get_results(predictions, labels, nov_label, classes_names, filepath=None
         results_frame.to_csv(filepath, index = False)
 
     return results_frame
+
+def svm_evaluate_nov_detection(results_frame, metrics=None, filepath=None):
+    """Evaluates accuracy for each class and other custom metrics as dict where each key is the metric name
+    and its value the computed metric.
+
+    Parameters:
+
+    results_frame: pandas.DataFrame
+        The frame returned from dvm_get_results
+
+    metrics: list
+        List where each item is a cllable thar represents a function that recieves y_true and y_pred as arguments
+
+    filepath: str
+        If passed, it becomes the path to save the json file of the dict
+
+    Returns:
+
+    evaluation_dict: dict
+        Dict with the metrics evaluated
+    """
+
+    y_true = results_frame.loc[:, 'True'].values.flatten()
+    y_pred = results_frame.loc[:, 'Pred'].values.flatten()
+    evaluation_dict = {f'{class_}_acc': accuracy_score(np.where(y_true == class_, 1, 0), np.where(y_pred == class_, 1, 0))
+                        for class_ in np.unique(y_true)}
+    if not metrics is None:
+        for metric in metrics:
+            evaluation_dict[metric.__name__] = metric(y_true, y_pred)
+    
+    if not filepath is None:
+        with open(filepath, 'w') as json_file:
+            json.dump(utils.cast_to_python(evaluation_dict), json_file, indent=4)
+
+    return evaluation_dict
 
 def create_threshold(quantity, 
                      interval):
