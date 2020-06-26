@@ -184,6 +184,8 @@ def cast_to_python(var):
         return float(var)
     elif (typo == np.int16) or (typo == np.int32) or (typo == np.int64):
         return int(var)
+    elif typo == np.str_:
+        return str(var)
     elif (typo == list) or (typo == np.ndarray):
         return [cast_to_python(value) for value in var]
     elif typo == tuple:
