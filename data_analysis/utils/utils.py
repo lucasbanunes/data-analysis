@@ -16,9 +16,21 @@ class DataSequence(Sequence):
     y_set: array like
         y set from the data
     """
-    def __init__(self, x_set, y_set=None):
+    def __init__(self, x_set, y_set=None, batch_size=32):
         self.x_set = self._numpy_array(x_set)
         self.y_set = self._numpy_array(y_set)
+        self.batch_size = batch_size
+
+    def __len__(self):
+        return np.math.ceil(len(self.x) / self.batch_size)
+
+    def __getitem__(self, index):
+        batch_x = self.x_set[index*self.batch_size:(index+1)*self.batch_size]
+        if self.y_set is None:
+           return batch_x
+        else:
+            batch_y = self.y_set[index*self.batch_size:(index+1)*self.batch_size]
+            return batch_x, batch_y  
 
     def apply(self, function, args=None):
         """Applies a function to the x and y sets.
