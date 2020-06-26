@@ -41,13 +41,13 @@ def svm_get_results(predictions, labels, nov_label, classes_names, filepath=None
 
     novelty_detec = np.all(predictions == -1, axis=1)
     classf = classes_names[np.argmax(predictions, axis=1)]
-    nov_and_classf = np.where(novelty_detec, 'Nov', classf)
+    nov_and_classf = np.where(novelty_detec, 'Nov', classf).reshape(-1, 1)
     columns = [f'Class_{class_}' for class_ in classes_names]
     columns.extend(['True', 'Pred'])
     classes_names = list(classes_names)
     classes_names.insert(nov_label, 'Nov')
     classes_names = np.array(classes_names)
-    y_true = classes_names[labels]
+    y_true = classes_names[labels].reshape(-1, 1)
     data = np.concatenate((predictions, y_true, nov_and_classf), axis=1)
     results_frame = pd.DataFrame(data, columns=columns)
 
