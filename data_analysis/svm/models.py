@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import sklearn as sk
 from sklearn.svm import SVC
+from multiprocessing import Pool
 from data_analysis.utils import utils
 
 class OneVsRestSVCCommittee():
@@ -31,8 +32,9 @@ class OneVsRestSVCCommittee():
         if expert_params is None:
             expert_params = dict.fromkeys(list(class_mapping.keys()), dict())
         self.classifiers = {class_: SVC(**params) for class_, params in expert_params.items()}
+        self.n_classes = len(self.class_mapping.items())
 
-    def fit(self, X, y, verbose=True):
+    def fit(self, X, y, n_workers=None, verbose=True):
         """Fits the SVC's for the given data
 
         Parameters:
@@ -43,15 +45,27 @@ class OneVsRestSVCCommittee():
         y: numpy.array
             True labels for X
         
+        n_workers: int
+            Number of processes to fit the svc's. If None is passed, it defaults to os.cpu_count()
+        
         verbose: bool
             If True outputs which SVC is being trained
         """
 
-        for class_name, class_value in self.class_mapping.items():
-            if verbose:
-                print(f'Fitting svm expert for class {class_name}')
-            self.classifiers[class_name].fit(X, np.where(y == class_value, 1, -1))
-    
+        pool = Pool(processes=n_workers)
+
+        if verbose:
+            print('Starting the SVC fit')
+
+        y_data = (y for _ in range(self.n_classes))
+        x_data = (X for _ in range(self.n_classes))
+        trained_models = pool.starmap(self._train_one_model, zip(self.class_mapping.values(), self.classifiers.values(), x_data, y_data), )
+        del self.classifiers
+        self.classifiers = {class_: classifier for class_, classifier in zip(self.class_mapping.keys(), trained_models)}
+        
+        if verbose:
+            print('Finished training')
+
     def get_params(self):
         """Returns a dict which each class key has the params from the SVC of the given class"""
         return {class_: classifier.get_params() for class_, classifier in self.classifiers.items()}
@@ -127,3 +141,8 @@ class OneVsRestSVCCommittee():
             Class of the SVC to have its parameters set
         """
         self.classifiers[class_].set_params(**params)
+
+    @staticmethod
+    def _train_one_model(class_value, model, X, y):
+        """Trains one model. Implemented for multiprocessing.Pool support"""
+        return model.fit(X, np.where(y == class_value, 1, -1))
