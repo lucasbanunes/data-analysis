@@ -62,6 +62,8 @@ class OneVsRestSVCCommittee():
         trained_models = pool.starmap(self._train_one_model, zip(self.class_mapping.values(), self.classifiers.values(), x_data, y_data), )
         del self.classifiers
         self.classifiers = {class_: classifier for class_, classifier in zip(self.class_mapping.keys(), trained_models)}
+        pool.close()
+        pool.join()
         
         if verbose:
             print('Finished training')
