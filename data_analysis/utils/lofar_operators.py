@@ -62,6 +62,9 @@ def window_runs(runs_per_class, classes, window_size, stride):
     
     win_labels: numpy.ndarray
         respective windows labels
+    
+    runs_range: numpy.ndarray
+        array with the range of each run with the new windowed data
     """
 
     runs_range = list()
