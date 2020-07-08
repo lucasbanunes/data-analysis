@@ -224,7 +224,7 @@ def evaluate_nov_detection(results_frame,
         if not os.path.exists(folder):
             os.makedirs(folder)
         eval_frame.to_csv(filepath, index = False)
-    return eval_frame    
+    return eval_frame
 
 def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), area=True, filepath=None):
     """Plot noc curve fro given results_frame
@@ -279,7 +279,7 @@ def plot_noc_curve(results_frame, nov_class_name, figsize=(12,3), area=True, fil
     return fig, axis
 
 def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=None):
-    """Plot noc curve fro given results_frame
+    """Plot nov acc and classf acc curves for given results_frame
 
     Parameters:
 
@@ -303,17 +303,18 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
     axis:
         axis with the plot
     """
-    y_true = np.where(results_frame.loc[:, 'Labels'].values.flatten() == 'Nov', 1, 0)     #Novelty is 1, known data is 0
-    novelty_matrix = np.where(results_frame.loc[:,'Classification'] == 'Nov', 1, 0)
+    nov_acc = nov_accuracy_score(results_frame)
+    classf_acc = classf_accuracy_score(results_frame)
     threshold = results_frame.loc[:,'Classification'].columns.values.flatten()
-    acc = np.apply_along_axis(lambda x: accuracy_score(y_true, x), 0, novelty_matrix)
     fig, axis = plt.subplots(figsize=figsize)
     axis.set_title(f'Novelty class {nov_class_name}')
     axis.set_ylabel('Accuracy')
     axis.set_ylim(0,1)
     axis.set_xlabel('Threshold')
-    axis.plot(threshold, acc, color='k')
+    axis.plot(threshold, nov_acc, color='blue', label='Nov acc')
+    axis.plot(threshold, classf_acc, color='red', label='Classf acc')
     axis.grid(color='k', alpha=0.5, linestyle='dashed', linewidth=0.5)
+    axis.legend(loc=4)
     plt.tight_layout()
     if not filepath is None:
         fig.savefig(fname=filepath, dpi=200, format='png')
