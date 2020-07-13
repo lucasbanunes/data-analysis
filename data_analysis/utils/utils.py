@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import tensorflow as tf
 import tensorflow.keras as keras
+from collections import Iterable
 from tensorflow.keras.utils import Sequence, to_categorical
 
 class DataSequence(Sequence):
@@ -203,12 +204,37 @@ def to_sparse_tanh(y, num_classes=None):
         event[class_] = 1
     return sparse_tanh
 
+def first_non_zero(num):
+    if isinstance(num, Iterable):
+        return np.array([first_non_zero(value) for value in num])
+    else:
+        decimals=0
+        i = 1
+        while decimals<8:
+            if num>=i:
+                return decimals
+            decimals += 1
+            i *= 0.1
+
+        return decimals
+
+def around_avg_with_error(avg, err):
+    if isinstance(avg, Iterable):
+        for i in range(len(avg)):
+            avg[i], err[i] = around_avg_with_error(avg[i], err[i])
+        return avg, err
+    else:
+        err, decimals = around(err)
+        avg = np.around(avg, decimals)
+
+        return avg, err
+
 def around(num):
     decimals=0
     i = 1
     while decimals<10:
-        if num>i:
-            return round(num, decimals), decimals
+        if num>=i:
+            return np.around(num, decimals), decimals
         decimals += 1
         i = i*0.1
     return 0.0, decimals
