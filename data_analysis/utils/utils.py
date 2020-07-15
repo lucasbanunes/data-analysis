@@ -23,7 +23,7 @@ class DataSequence(Sequence):
         self.batch_size = batch_size
 
     def __len__(self):
-        return np.math.ceil(len(self.x) / self.batch_size)
+        return np.math.ceil(len(self.x_set) / self.batch_size)
 
     def __getitem__(self, index):
         batch_x = self.x_set[index*self.batch_size:(index+1)*self.batch_size]
