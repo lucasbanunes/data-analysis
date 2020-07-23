@@ -288,3 +288,16 @@ def sort_dict(dictionary):
     """Sorts a dictionary using key order"""
     keys, values = sort_pair(list(dictionary.keys()), list(dictionary.values()))
     return {key: value for key, value in zip(keys,values)}
+
+def add_unique(unique_classes, unique_counts, labels):
+    added_classes = list()
+    added_counts = list()
+    index = np.arange(len(unique_classes))
+    for label in labels:
+        added_classes.append(label)
+        if label in unique_classes:
+            add_index = index[unique_classes == label]
+            added_counts.append(int(unique_counts[add_index]))
+        else:
+            added_counts.append(0)
+    return np.array(added_classes), np.array(added_counts)
