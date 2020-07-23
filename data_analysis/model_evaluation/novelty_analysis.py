@@ -183,6 +183,40 @@ def get_results(predictions,
             novelty_frame.to_csv(filepath, index = False)
         return novelty_frame
 
+def novelty_report(results_frame, neuron_classes, filepath=None):
+    data = list()
+    index = list()
+    output = results_frame.loc[:,'Neurons'].values
+    labels = np.array(results_frame.loc[:,('Labels', 'L')].values.flatten(), dtype=str)
+    nov_output = output[labels == 'Nov']
+    nov_classf = _get_novelty_matrix(nov_output, np.array([0]), neuron_classes)
+    classes_unique, classes_counts = np.unique(nov_classf, return_counts=True)
+    nov_classes, nov_counts = utils.add_unique(classes_unique,classes_counts, neuron_classes)
+
+    for neuron_out, neuron_class, class_occurences in zip(nov_output.T, nov_classes, nov_counts):
+        index.append(neuron_class)
+
+        neuron_out = np.sort(neuron_out)
+        min_split = np.math.ceil(len(neuron_out)*0.05)
+        max_split = np.math.ceil(len(neuron_out)*0.95)
+        avg = np.sum(neuron_out)/len(neuron_out)
+        err = np.sqrt(np.var(neuron_out))
+        min_avg = np.sum(neuron_out[:min_split])/len(neuron_out[:min_split])
+        min_err = np.sqrt(np.var(neuron_out[:min_split]))
+        max_avg = np.sum(neuron_out[max_split:]/len(neuron_out[max_split:]))
+        max_err = np.sqrt(np.var(neuron_out[max_split:]))
+        data.append([class_occurences, avg, err, min_avg, min_err, neuron_out[0], max_avg, max_err, neuron_out[-1]])
+
+    report_frame = pd.DataFrame(np.array(data), index=index, 
+                                columns=['class_occurences', 'avg', 'err', 'min avg', 'min_err', 'min_value', 'max_avg', 'max_err', 'max_value'])
+    if not filepath is None:
+        folder, _ = os.path.split(filepath)
+        if not os.path.exists(folder):
+            os.makedirs(folder)
+        report_frame.to_csv(filepath, index = False)
+    
+    return report_frame
+
 def evaluate_nov_detection(results_frame,
                     metrics = None, 
                     filepath = None):
