@@ -247,7 +247,7 @@ def evaluate_nov_detection(results_frame,
     data.extend(list(get_recall_score(results_frame)))
     for class_ in known_classes:
         index.append(f'{class_} Acc')
-        data.append(_class_acc_per_class(results_frame, class_))
+        data.append(_classf_acc_per_class(results_frame, class_))
     if not metrics is None:
         for metric in metrics:
             index.append(metric.__name__)
@@ -339,14 +339,14 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
     """
     nov_acc = nov_accuracy_score(results_frame)
     classf_acc = classf_accuracy_score(results_frame)
-    threshold = results_frame.loc[:,'Classification'].columns.values.flatten()
+    threshold = np.array(results_frame.loc[:,'Classification'].columns.values.flatten(), dtype=np.float64)
     fig, axis = plt.subplots(figsize=figsize)
     axis.set_title(f'Novelty class {nov_class_name}')
     axis.set_ylabel('Accuracy')
     axis.set_ylim(0,1)
     axis.set_xlabel('Threshold')
-    axis.plot(threshold, nov_acc, color='blue', label='Nov acc')
-    axis.plot(threshold, classf_acc, color='red', label='Classf acc')
+    axis.plot(threshold, nov_acc, label='Nov acc')
+    axis.plot(threshold, classf_acc, label='Classf acc')
     axis.grid(color='k', alpha=0.5, linestyle='dashed', linewidth=0.5)
     axis.legend(loc=4)
     plt.tight_layout()
@@ -357,14 +357,18 @@ def plot_accuracy_curve(results_frame, nov_class_name, figsize=(12,3), filepath=
 
 def get_recall_score(results_frame):
     """Computes recall_score for each threshold for both novelty detection and known data.
-        Returns a (len(threshold), 2) shape ndarray where index[0] is recall for known class and index[1] for novelty class."""
+        Returns a (2, len(threshold)) shape ndarray where index[0] is recall for known class and index[1] for novelty class."""
     y_true, novelty_matrix = _get_as_binary(results_frame)
     return np.apply_along_axis(lambda x: recall_score(y_true, x, labels=[0,1], average=None), 0, novelty_matrix)
 
 def nov_accuracy_score(results_frame):
-    """Computes accuracy_score for each threshold"""
+    """Computes novelty accuracy_score for each threshold
+    novelty accuracy score = novelties prdicted as novelties/ total number of novelties"""
+
     y_true, novelty_matrix = _get_as_binary(results_frame)
-    return np.apply_along_axis(lambda x: accuracy_score(y_true, x), 0, novelty_matrix)
+    total_novelties = np.sum(y_true)
+    correct_novelties = np.apply_along_axis(lambda x: np.sum(x[y_true == 1]), 0, novelty_matrix)
+    return correct_novelties/total_novelties
 
 def classf_accuracy_score(results_frame):
     """Computes classification accuracy for each threshold"""
@@ -382,12 +386,12 @@ def classf_accuracy_per_class(results_frame, class_=None):
         known_classes = classes[classes != 'Nov']
         acc = list()
         for class_ in known_classes:
-            acc.append(_class_acc_per_class(results_frame, class_))
+            acc.append(_classf_acc_per_class(results_frame, class_))
         return np.array(acc)
     else:
-        return _class_acc_per_class(results_frame, class_)
+        return _classf_acc_per_class(results_frame, class_)
 
-def _class_acc_per_class(results_frame, class_):
+def _classf_acc_per_class(results_frame, class_):
     pred_matrix = results_frame.loc[:, 'Classification'].values
     labels = results_frame.loc[:, 'Labels'].values.flatten()
     class_labels = labels[labels == class_]
