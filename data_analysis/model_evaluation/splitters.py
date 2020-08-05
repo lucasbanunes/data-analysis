@@ -56,6 +56,8 @@ def most_even_split(index_range, n_splits):
     [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
     divided in 5 splits could happen in any number of ways but this method splits it the most 
     even way possible that is two splits with 2 events and 3 splits with 3 elements.
+    then the funcition returns:
+    [(0,1,2), (3,4,5), (6,7,8), (9,10), (11,12)]
 
     Parameters:
 
@@ -76,21 +78,21 @@ def most_even_split(index_range, n_splits):
     events_per_split = int(events/n_splits)
     remainders = events%n_splits
     if remainders == 0:     #The array is splitted evenly
-        splits =  [np.arange(split_start, split_start+events_per_split) for split_start in range(index_start, index_end, events_per_split)]
+        splits =  [range(split_start, split_start+events_per_split) for split_start in range(index_start, index_end, events_per_split)]
     else:
         #Mouting the uneven splits
         splits = list()
         start = index_start
-        events_to_add = math_utils.euclidean_algorithm(remainders, n_splits)
+        #events_to_add = math_utils.euclidean_algorithm(remainders, n_splits)
         for _ in range(n_splits):
             if remainders>0:
-                to_add = events_per_split + events_to_add
-                remainders -= events_to_add
+                to_add = events_per_split + 1
+                remainders -= 1
             elif remainders == 0:
                 to_add = events_per_split
             else:
                 raise ValueError(f'Reached a negative remainder: {remainders}')
-            splits.append(np.arange(start, start+to_add))
+            splits.append(range(start, start+to_add))
             start += to_add
     return splits
 
