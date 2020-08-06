@@ -197,6 +197,14 @@ def multi_init_fit(model, compile_params, x,
 
 	return model, log
 
+def is_model(layer):
+	"""returns true if a layer is actually a model"""
+	try:
+		layer.get_config()['layers']
+		return True
+	except KeyError:
+		return False
+
 def reinitialize_weights(model, verbose=True):
 	"""Reinitialize the trainable weights from the model
 
