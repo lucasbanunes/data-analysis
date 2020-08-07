@@ -22,6 +22,6 @@ def expert_mse(y_true, y_pred):
     only_one_class = tf.cast(tf.reduce_all(class_mask), dtype=tf.int16) + tf.cast(tf.reduce_all(non_class_mask), dtype=tf.int16)
     #If the batch only has events of only one class then the normal mse is the output
     error = K.switch(only_one_class,
-                        keras.losses.mean_squared_error(y_true, y_pred), 
+                        0.5*keras.losses.mean_squared_error(y_true, y_pred), 
                         0.5*keras.losses.mean_squared_error(y_true[class_mask], y_pred[class_mask])+0.5*keras.losses.mean_squared_error(y_true[non_class_mask], y_pred[non_class_mask]))
     return error
