@@ -238,3 +238,76 @@ def reinitialize_weights(model, verbose=True):
 						initializer = getattr(keras.initializers, layer_config['bias_initializer']['class_name']).from_config(layer_config['bias_initializer']['config'])
 					param.append(np.array(initializer.__call__(shape=shapes[i])))
 				layer.set_weights(param)
+
+class MultiInitLog():
+
+    def __init__(self):
+        super(MultiInitLog, self).__init__()
+        self.inits = list()
+        self.model_config = None
+        self.current_init = 0
+
+    def add_initialization(self, model, history):
+        if self.current_init == 0:
+            self.model_config = model.to_json()
+        else:
+            if self.model_config != model.to_json():
+                raise ValueError(f'The multi init must be used with only one model configuration. The current model is different from the previous ones')
+			
+        self.inits.append({'weights': model.get_weights(), 'logs': history.history, 'params': history.params})
+        self.current_init += 1
+
+    def get_best_init(self, metric, mode, training_end):
+
+        self._check_inits_integrity()
+        best_init = 0
+
+        if mode == 'max':
+            best_metric = -np.inf
+            is_best = lambda x: x>best_metric
+            get_best = np.amax
+        elif mode == 'min':
+            best_metric = np.inf
+            is_best = lambda x: x<best_metric
+            get_best = np.amin
+        else:
+            raise ValueError(f'Only "max" and "min" are options for the mode parameter. {mode} was passed')
+
+        if training_end:
+            for init in range(len(self.inits)):
+                current_metric = self.inits[init]['logs'][metric][-1]
+                best_init = init if is_best(current_metric) else best_init
+        else:
+            for init in range(len(self.inits)):
+                current_metric = get_best(self.inits[init]['logs'][metric])
+                best_init = init if is_best(current_metric) else best_init
+        
+        return best_init
+
+    def best_weights(self, metric, mode, training_end):
+        best_init = self.get_best_init(metric, mode, training_end)
+        return self.inits[best_init]['weights']  
+
+    def _check_inits_integrity(self):
+        for init in range(len(self.inits)):
+            if self.inits[init]['logs'] is None or self.inits[init]['params'] is None:
+                raise ValueError(f'Init {init} is missing its callback.History. You can add it using add_history method')
+
+    def to_json(self, filepath):
+        """Saves the callback into a json file"""
+
+        with open(filepath, 'w') as json_file:
+            json_dict = utils.cast_to_python(self.__dict__)
+            json.dump(json_dict, json_file, indent=4)
+
+    @classmethod
+    def from_json(cls, filepath):
+        """Load the callback from a json file"""
+         
+        with open(filepath, 'r') as json_file:
+            json_dict = json.load(json_file)
+
+        callback = cls()
+        callback.__dict__ = json_dict
+
+        return callback
