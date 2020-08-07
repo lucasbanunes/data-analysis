@@ -199,7 +199,7 @@ def cast_to_python(var):
 def to_sparse_tanh(y, num_classes=None):
     if num_classes is None:
         num_classes = len(np.unique(y))
-    sparse_tanh = np.full(shape=(len(y), num_classes), fill_value=-1, dtype=np.int32)
+    sparse_tanh = np.full(shape=(len(y), num_classes), fill_value=-1, dtype=np.int8)
     for class_, event in zip(y,sparse_tanh):
         event[class_] = 1
     return sparse_tanh
